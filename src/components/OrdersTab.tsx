@@ -58,33 +58,78 @@ const mockOrders = [
 const OrdersTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
   const [uploadStats, setUploadStats] = useState({
     inserted: 0,
     updated: 0,
     cancelled: 0
   });
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const rows = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim()) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+        const row: any = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        rows.push(row);
+      }
+    }
+    return rows;
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      // Mock processing
-      setTimeout(() => {
-        setUploadStats({
-          inserted: 15,
-          updated: 8,
-          cancelled: 3
-        });
-        toast({
-          title: "File uploaded successfully",
-          description: `Processed ${file.name} - 26 orders total`,
-        });
-      }, 1000);
+      setIsProcessing(true);
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const parsedOrders = parseCSV(text);
+          
+          // Count operations
+          const stats = {
+            inserted: parsedOrders.filter(o => o.operation?.toLowerCase() === 'insert').length,
+            updated: parsedOrders.filter(o => o.operation?.toLowerCase() === 'update').length,
+            cancelled: parsedOrders.filter(o => o.operation?.toLowerCase() === 'cancel').length
+          };
+          
+          setOrders(parsedOrders);
+          setUploadStats(stats);
+          setIsProcessing(false);
+          
+          toast({
+            title: "File uploaded successfully",
+            description: `Processed ${file.name} - ${parsedOrders.length} orders total`,
+          });
+        } catch (error) {
+          setIsProcessing(false);
+          toast({
+            title: "Error processing file",
+            description: "Please check the CSV format and try again.",
+            variant: "destructive"
+          });
+        }
+      };
+      reader.readAsText(file);
     }
   };
 
-  const filteredOrders: any[] = [];
+  const filteredOrders = orders.filter(order => 
+    order.content_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.theatre_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.order_id?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -116,17 +161,21 @@ const OrdersTab = () => {
                   {(selectedFile.size / 1024).toFixed(1)} KB
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="bg-status-success-bg text-status-success">
-                  {uploadStats.inserted} Inserted
-                </Badge>
-                <Badge variant="outline" className="bg-status-info-bg text-status-info">
-                  {uploadStats.updated} Updated
-                </Badge>
-                <Badge variant="outline" className="bg-status-error-bg text-status-error">
-                  {uploadStats.cancelled} Cancelled
-                </Badge>
-              </div>
+              {isProcessing ? (
+                <div className="text-sm text-muted-foreground">Processing...</div>
+              ) : (
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="bg-status-success-bg text-status-success">
+                    {uploadStats.inserted} Inserted
+                  </Badge>
+                  <Badge variant="outline" className="bg-status-info-bg text-status-info">
+                    {uploadStats.updated} Updated
+                  </Badge>
+                  <Badge variant="outline" className="bg-status-error-bg text-status-error">
+                    {uploadStats.cancelled} Cancelled
+                  </Badge>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -179,15 +228,15 @@ const OrdersTab = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.order_id}>
-                      <TableCell className="font-medium">{order.order_id}</TableCell>
+                  filteredOrders.map((order, index) => (
+                    <TableRow key={order.order_id || index}>
+                      <TableCell className="font-medium">{order.order_id || order.tmc_media_order_id}</TableCell>
                       <TableCell>
-                        <StatusBadge status={order.operation as any} />
+                        <StatusBadge status={order.operation} />
                       </TableCell>
                       <TableCell className="font-medium">{order.content_title}</TableCell>
-                      <TableCell>{order.theatre_name}</TableCell>
-                      <TableCell>{order.theatre_city}, {order.theatre_state}</TableCell>
+                      <TableCell>{order.theatre_name || order.qw_theatre_name}</TableCell>
+                      <TableCell>{order.theatre_city || order.qw_theatre_city}, {order.theatre_state || order.qw_theatre_state}</TableCell>
                       <TableCell className="text-sm">
                         {order.playdate_begin} to {order.playdate_end}
                       </TableCell>

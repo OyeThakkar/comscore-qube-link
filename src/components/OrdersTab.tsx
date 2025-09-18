@@ -84,11 +84,7 @@ const OrdersTab = () => {
     }
   };
 
-  const filteredOrders = mockOrders.filter(order => 
-    order.content_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.theatre_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.order_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders: any[] = [];
 
   return (
     <div className="space-y-6">
@@ -176,27 +172,35 @@ const OrdersTab = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.order_id}>
-                    <TableCell className="font-medium">{order.order_id}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={order.operation as any} />
+                {filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No orders found. Upload a CSV file to get started.
                     </TableCell>
-                    <TableCell className="font-medium">{order.content_title}</TableCell>
-                    <TableCell>{order.theatre_name}</TableCell>
-                    <TableCell>{order.theatre_city}, {order.theatre_state}</TableCell>
-                    <TableCell className="text-sm">
-                      {order.playdate_begin} to {order.playdate_end}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{order.booker_name}</p>
-                        <p className="text-sm text-muted-foreground">{order.booker_email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{order.studio_name}</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow key={order.order_id}>
+                      <TableCell className="font-medium">{order.order_id}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={order.operation as any} />
+                      </TableCell>
+                      <TableCell className="font-medium">{order.content_title}</TableCell>
+                      <TableCell>{order.theatre_name}</TableCell>
+                      <TableCell>{order.theatre_city}, {order.theatre_state}</TableCell>
+                      <TableCell className="text-sm">
+                        {order.playdate_begin} to {order.playdate_end}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{order.booker_name}</p>
+                          <p className="text-sm text-muted-foreground">{order.booker_email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{order.studio_name}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,9 @@ import StatusBadge from "./StatusBadge";
 // Mock data for booking manager
 const mockBookingData = [
   {
+    content_id: "CNT-001",
     content_title: "Top Gun: Maverick",
+    package_uuid: "pkg-001-uuid-topgun",
     cpl_list: "CPL-001-MAIN, CPL-001-TRAILER",
     booking_count: 245,
     pending_bookings: 23,
@@ -23,7 +26,9 @@ const mockBookingData = [
     completion_rate: 85
   },
   {
-    content_title: "Avatar: The Way of Water", 
+    content_id: "CNT-002",
+    content_title: "Avatar: The Way of Water",
+    package_uuid: "pkg-002-uuid-avatar", 
     cpl_list: "CPL-002-MAIN, CPL-002-3D, CPL-002-IMAX",
     booking_count: 189,
     pending_bookings: 34,
@@ -35,7 +40,9 @@ const mockBookingData = [
     completion_rate: 70
   },
   {
+    content_id: "CNT-003",
     content_title: "Black Panther: Wakanda Forever",
+    package_uuid: "pkg-003-uuid-blackpanther",
     cpl_list: "",
     booking_count: 156,
     pending_bookings: 156,
@@ -51,6 +58,11 @@ const mockBookingData = [
 const BookingManagerTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleViewDetails = (item: any) => {
+    navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
+  };
 
   const filteredData = mockBookingData.filter(item => 
     item.content_title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -216,7 +228,12 @@ const BookingManagerTab = () => {
                       {item.updated_on.split(' ')[0]}
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" variant="outline" className="h-8">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8"
+                        onClick={() => handleViewDetails(item)}
+                      >
                         <Eye className="h-3 w-3 mr-1" />
                         Details
                       </Button>

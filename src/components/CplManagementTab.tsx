@@ -174,7 +174,7 @@ const CplManagementTab = () => {
                       <TableCell className="font-medium">{item.content_title || '-'}</TableCell>
                       <TableCell>{item.film_id || '-'}</TableCell>
                       <TableCell className="font-mono text-sm">{item.package_uuid || '-'}</TableCell>
-                      <TableCell className="max-w-md">
+                      <TableCell className={`max-w-md ${!item.cpl_list ? 'bg-destructive/10 border-destructive/20' : ''}`}>
                         <div className="space-y-1">
                           {item.cpl_list ? (
                             item.cpl_list.split(',').map((cpl: string, idx: number) => (
@@ -183,7 +183,7 @@ const CplManagementTab = () => {
                               </Badge>
                             ))
                           ) : (
-                            <span className="text-muted-foreground italic">No CPLs defined</span>
+                            <span className="text-destructive font-medium">No CPLs defined</span>
                           )}
                         </div>
                       </TableCell>

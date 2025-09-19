@@ -82,7 +82,15 @@ const CplManagementTab = () => {
   };
 
   const handleSave = () => {
-    // Mock save operation - in a real app, this would update a CPL management table
+    // Update the CPL data in the local state
+    setCplData(prevData => 
+      prevData.map(item => 
+        item.content_id === editingItem?.content_id && item.package_uuid === editingItem?.package_uuid
+          ? { ...item, cpl_list: editingCpl }
+          : item
+      )
+    );
+    
     toast({
       title: "CPL updated successfully",
       description: `Updated CPL list for content ${editingItem?.content_id}`,

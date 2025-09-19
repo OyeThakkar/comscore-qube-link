@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Package, Edit, Save, History, Search, RefreshCw } from "lucide-react";
+import { Package, Edit, Save, History, Search, RefreshCw, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +22,7 @@ const CplManagementTab = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const fetchUniqueContent = async () => {
     if (!user) return;
@@ -94,6 +96,10 @@ const CplManagementTab = () => {
     setDialogOpen(false);
     setEditingItem(null);
     setEditingCpl("");
+  };
+
+  const handleViewDetails = (item: any) => {
+    navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
   };
 
   const filteredData = cplData.filter(item => 
@@ -196,6 +202,14 @@ const CplManagementTab = () => {
                             className="h-8"
                           >
                             <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleViewDetails(item)}
+                            className="h-8"
+                          >
+                            <Eye className="h-3 w-3" />
                           </Button>
                           <Button size="sm" variant="outline" className="h-8">
                             <History className="h-3 w-3" />

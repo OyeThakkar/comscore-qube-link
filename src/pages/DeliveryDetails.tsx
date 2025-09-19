@@ -355,9 +355,14 @@ const DeliveryDetails = () => {
                     ) : filteredDeliveries.length > 0 ? (
                       filteredDeliveries.map((delivery, index) => (
                         <TableRow key={delivery.id || index}>
-                          <TableCell className="font-medium" title={`QW Theatre ID: ${delivery.qw_theatre_id || delivery.tmc_theatre_id || 'N/A'}`}>
+                          <TableCell className="font-medium">
                             <div>
-                              <div className="font-medium">{delivery.theatre_name || '-'}</div>
+                              <div 
+                                className="font-medium cursor-help" 
+                                title={`QW Theatre ID: ${delivery.qw_theatre_id || delivery.tmc_theatre_id || 'N/A'}`}
+                              >
+                                {delivery.theatre_name || '-'}
+                              </div>
                               <div className="text-sm text-muted-foreground">
                                 {formatLocation(delivery)}
                               </div>

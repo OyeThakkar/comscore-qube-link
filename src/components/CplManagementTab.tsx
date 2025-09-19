@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Package, Edit, Save, History, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,27 +46,31 @@ const mockCplData = [
 
 const CplManagementTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [editingCpl, setEditingCpl] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleEdit = (contentId: string, currentCpl: string) => {
-    setEditingRow(contentId);
-    setEditingCpl(currentCpl);
+  const handleEdit = (item: any) => {
+    setEditingItem(item);
+    setEditingCpl(item.cpl_list);
+    setDialogOpen(true);
   };
 
-  const handleSave = (contentId: string) => {
+  const handleSave = () => {
     // Mock save operation
     toast({
       title: "CPL updated successfully",
-      description: `Updated CPL list for content ${contentId}`,
+      description: `Updated CPL list for content ${editingItem?.content_id}`,
     });
-    setEditingRow(null);
+    setDialogOpen(false);
+    setEditingItem(null);
     setEditingCpl("");
   };
 
   const handleCancel = () => {
-    setEditingRow(null);
+    setDialogOpen(false);
+    setEditingItem(null);
     setEditingCpl("");
   };
 
@@ -126,46 +131,17 @@ const CplManagementTab = () => {
                     <TableCell>{item.film_id}</TableCell>
                     <TableCell className="font-mono text-sm">{item.package_uuid}</TableCell>
                     <TableCell className="max-w-md">
-                      {editingRow === item.content_id ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            value={editingCpl}
-                            onChange={(e) => setEditingCpl(e.target.value)}
-                            placeholder="Enter CPL IDs separated by commas..."
-                            className="min-h-20"
-                          />
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleSave(item.content_id)}
-                              className="h-8"
-                            >
-                              <Save className="h-3 w-3 mr-1" />
-                              Save
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={handleCancel}
-                              className="h-8"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          {item.cpl_list ? (
-                            item.cpl_list.split(',').map((cpl, idx) => (
-                              <Badge key={idx} variant="secondary" className="mr-1 mb-1">
-                                {cpl.trim()}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-muted-foreground italic">No CPLs defined</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="space-y-1">
+                        {item.cpl_list ? (
+                          item.cpl_list.split(',').map((cpl, idx) => (
+                            <Badge key={idx} variant="secondary" className="mr-1 mb-1">
+                              {cpl.trim()}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground italic">No CPLs defined</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-primary/10 text-primary">
@@ -184,16 +160,14 @@ const CplManagementTab = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        {editingRow !== item.content_id && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleEdit(item.content_id, item.cpl_list)}
-                            className="h-8"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        )}
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleEdit(item)}
+                          className="h-8"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
                         <Button size="sm" variant="outline" className="h-8">
                           <History className="h-3 w-3" />
                         </Button>
@@ -206,6 +180,46 @@ const CplManagementTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit CPL Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit CPL List</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Content Details</Label>
+              <div className="bg-muted p-3 rounded-md">
+                <p><span className="font-medium">Content ID:</span> {editingItem?.content_id}</p>
+                <p><span className="font-medium">Title:</span> {editingItem?.content_title}</p>
+                <p><span className="font-medium">Film ID:</span> {editingItem?.film_id}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cpl-list" className="text-sm font-medium">
+                CPL List (comma-separated)
+              </Label>
+              <Textarea
+                id="cpl-list"
+                value={editingCpl}
+                onChange={(e) => setEditingCpl(e.target.value)}
+                placeholder="Enter CPL IDs separated by commas..."
+                className="min-h-32"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

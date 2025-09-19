@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,64 +8,122 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart3, Search, RefreshCw, Eye, TrendingUp, Package, AlertCircle } from "lucide-react";
 import StatusBadge from "./StatusBadge";
-
-// Mock data for booking manager
-const mockBookingData = [
-  {
-    content_id: "CNT-001",
-    content_title: "Top Gun: Maverick",
-    package_uuid: "pkg-001-uuid-topgun",
-    cpl_list: "CPL-001-MAIN, CPL-001-TRAILER",
-    booking_count: 245,
-    pending_bookings: 23,
-    shipped: 180,
-    downloading: 15,
-    completed: 165,
-    cancelled: 8,
-    updated_on: "2024-01-15 14:30:00",
-    completion_rate: 85
-  },
-  {
-    content_id: "CNT-002",
-    content_title: "Avatar: The Way of Water",
-    package_uuid: "pkg-002-uuid-avatar", 
-    cpl_list: "CPL-002-MAIN, CPL-002-3D, CPL-002-IMAX",
-    booking_count: 189,
-    pending_bookings: 34,
-    shipped: 155,
-    downloading: 22,
-    completed: 133,
-    cancelled: 0,
-    updated_on: "2024-01-14 11:20:00",
-    completion_rate: 70
-  },
-  {
-    content_id: "CNT-003",
-    content_title: "Black Panther: Wakanda Forever",
-    package_uuid: "pkg-003-uuid-blackpanther",
-    cpl_list: "",
-    booking_count: 156,
-    pending_bookings: 156,
-    shipped: 0,
-    downloading: 0,
-    completed: 0,
-    cancelled: 0,
-    updated_on: "2024-01-13 16:45:00",
-    completion_rate: 0
-  }
-];
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const BookingManagerTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
+  const [bookingData, setBookingData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const fetchBookingData = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      // Fetch all orders for the user
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Group orders by content_id and package_uuid to create booking data
+      const contentMap = new Map();
+      
+      orders?.forEach(order => {
+        if (!order.content_id || !order.content_title) return;
+        
+        const key = `${order.content_id}-${order.package_uuid}`;
+        
+        if (!contentMap.has(key)) {
+          contentMap.set(key, {
+            content_id: order.content_id,
+            content_title: order.content_title,
+            package_uuid: order.package_uuid,
+            film_id: order.film_id,
+            cpl_list: "", // This would come from CPL management
+            booking_count: 0,
+            pending_bookings: 0,
+            shipped: 0,
+            downloading: 0,
+            completed: 0,
+            cancelled: 0,
+            updated_on: order.updated_at,
+            completion_rate: 0,
+            orders: []
+          });
+        }
+        
+        const content = contentMap.get(key);
+        content.orders.push(order);
+        content.booking_count++;
+        
+        // Mock status assignment based on operation - in real app this would be tracked separately
+        switch (order.operation?.toLowerCase()) {
+          case 'insert':
+            content.pending_bookings++;
+            break;
+          case 'update':
+            content.shipped++;
+            break;
+          case 'cancel':
+            content.cancelled++;
+            break;
+          default:
+            content.pending_bookings++;
+        }
+        
+        // Update latest timestamp
+        if (new Date(order.updated_at) > new Date(content.updated_on)) {
+          content.updated_on = order.updated_at;
+        }
+      });
+
+      // Calculate completion rates and final status counts
+      const bookingArray = Array.from(contentMap.values()).map(content => {
+        // Mock some completed deliveries for demonstration
+        content.completed = Math.floor(content.shipped * 0.8);
+        content.downloading = content.shipped - content.completed;
+        content.completion_rate = content.booking_count > 0 
+          ? Math.round((content.completed / content.booking_count) * 100) 
+          : 0;
+        
+        return content;
+      });
+
+      setBookingData(bookingArray);
+    } catch (error: any) {
+      console.error('Error fetching booking data:', error);
+      toast({
+        title: "Error loading booking data",
+        description: error.message || "Failed to load booking information",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchBookingData();
+    }
+  }, [user]);
 
   const handleViewDetails = (item: any) => {
     navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
   };
 
-  const filteredData = mockBookingData.filter(item => 
-    item.content_title.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredData = bookingData.filter(item => 
+    (item.content_title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.content_id || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalBookings = filteredData.reduce((sum, item) => sum + item.booking_count, 0);
@@ -145,8 +203,13 @@ const BookingManagerTab = () => {
                   className="pl-9 w-80"
                 />
               </div>
-              <Button variant="outline" size="icon">
-                <RefreshCw className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={fetchBookingData}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
@@ -167,79 +230,101 @@ const BookingManagerTab = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{item.content_title}</TableCell>
-                    <TableCell>
-                      {item.cpl_list ? (
-                        <Badge variant="outline" className="bg-status-success-bg text-status-success">
-                          CPL Mapped
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-status-error-bg text-status-error">
-                          No CPL
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-primary/10 text-primary">
-                        {item.booking_count}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="outline" 
-                        className={item.pending_bookings > 0 ? 
-                          "bg-status-warning-bg text-status-warning" : 
-                          "bg-status-success-bg text-status-success"
-                        }
-                      >
-                        {item.pending_bookings}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="w-48">
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-sm">
-                          <span>Progress</span>
-                          <span>{item.completion_rate}%</span>
-                        </div>
-                        <Progress value={item.completion_rate} className="h-2" />
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Loading booking data...
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="outline" className="bg-status-success-bg text-status-success text-xs">
-                          {item.shipped} Shipped
-                        </Badge>
-                        <Badge variant="outline" className="bg-status-pending-bg text-status-pending text-xs">
-                          {item.downloading} Downloading
-                        </Badge>
-                        <Badge variant="outline" className="bg-status-success-bg text-status-success text-xs">
-                          {item.completed} Done
-                        </Badge>
-                        {item.cancelled > 0 && (
-                          <Badge variant="outline" className="bg-status-error-bg text-status-error text-xs">
-                            {item.cancelled} Cancelled
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {item.updated_on.split(' ')[0]}
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-8"
-                        onClick={() => handleViewDetails(item)}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        Details
-                      </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredData.length > 0 ? (
+                  filteredData.map((item, index) => (
+                    <TableRow key={`${item.content_id}-${item.package_uuid}` || index}>
+                      <TableCell className="font-medium">{item.content_title}</TableCell>
+                      <TableCell>
+                        {item.cpl_list ? (
+                          <Badge variant="outline" className="bg-status-success-bg text-status-success">
+                            CPL Mapped
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-status-error-bg text-status-error">
+                            No CPL
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-primary/10 text-primary">
+                          {item.booking_count}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={item.pending_bookings > 0 ? 
+                            "bg-status-warning-bg text-status-warning" : 
+                            "bg-status-success-bg text-status-success"
+                          }
+                        >
+                          {item.pending_bookings}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="w-48">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Progress</span>
+                            <span>{item.completion_rate}%</span>
+                          </div>
+                          <Progress value={item.completion_rate} className="h-2" />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="outline" className="bg-status-success-bg text-status-success text-xs">
+                            {item.shipped} Shipped
+                          </Badge>
+                          <Badge variant="outline" className="bg-status-pending-bg text-status-pending text-xs">
+                            {item.downloading} Downloading
+                          </Badge>
+                          <Badge variant="outline" className="bg-status-success-bg text-status-success text-xs">
+                            {item.completed} Done
+                          </Badge>
+                          {item.cancelled > 0 && (
+                            <Badge variant="outline" className="bg-status-error-bg text-status-error text-xs">
+                              {item.cancelled} Cancelled
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {item.updated_on ? new Date(item.updated_on).toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8"
+                          onClick={() => handleViewDetails(item)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="space-y-2">
+                        <p className="text-muted-foreground">No booking data found</p>
+                        <p className="text-xs text-muted-foreground">
+                          {searchTerm ? 'Try adjusting your search criteria' : 'Upload some orders to see booking information'}
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

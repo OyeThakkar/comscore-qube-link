@@ -206,47 +206,108 @@ const OrdersTab = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Operation</TableHead>
-                  <TableHead>Content Title</TableHead>
-                  <TableHead>Theatre</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Play Dates</TableHead>
-                  <TableHead>Booker</TableHead>
-                  <TableHead>Studio</TableHead>
+                  <TableHead className="whitespace-nowrap">Order ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Media Type</TableHead>
+                  <TableHead className="whitespace-nowrap">Cancel Flag</TableHead>
+                  <TableHead className="whitespace-nowrap">Operation</TableHead>
+                  <TableHead className="whitespace-nowrap">Play Date Begin</TableHead>
+                  <TableHead className="whitespace-nowrap">Play Date End</TableHead>
+                  <TableHead className="whitespace-nowrap">Hold Key Flag</TableHead>
+                  <TableHead className="whitespace-nowrap">TMC Media Order ID</TableHead>
+                  <TableHead className="whitespace-nowrap">TMC Theatre ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Note</TableHead>
+                  <TableHead className="whitespace-nowrap">Screen No</TableHead>
+                  <TableHead className="whitespace-nowrap">Screening Time</TableHead>
+                  <TableHead className="whitespace-nowrap">Do Not Ship</TableHead>
+                  <TableHead className="whitespace-nowrap">Ship Hold Type</TableHead>
+                  <TableHead className="whitespace-nowrap">Delivery Method</TableHead>
+                  <TableHead className="whitespace-nowrap">Return Method</TableHead>
+                  <TableHead className="whitespace-nowrap">Is No Key</TableHead>
+                  <TableHead className="whitespace-nowrap">Booker Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Booker Phone</TableHead>
+                  <TableHead className="whitespace-nowrap">Booker Email</TableHead>
+                  <TableHead className="whitespace-nowrap">Content ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Content Title</TableHead>
+                  <TableHead className="whitespace-nowrap">Package UUID</TableHead>
+                  <TableHead className="whitespace-nowrap">Film ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Chain Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre Address</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre City</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre State</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre Postal Code</TableHead>
+                  <TableHead className="whitespace-nowrap">Theatre Country</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Identifier</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Theatre ID</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Theatre Name</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Theatre City</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Theatre State</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Theatre Country</TableHead>
+                  <TableHead className="whitespace-nowrap">Studio ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Studio Name</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Company ID</TableHead>
+                  <TableHead className="whitespace-nowrap">QW Company Name</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={42} className="text-center py-8 text-muted-foreground">
                       No orders found. Upload a CSV file to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredOrders.map((order, index) => (
                     <TableRow key={order.order_id || index}>
-                      <TableCell className="font-medium">{order.order_id || order.tmc_media_order_id}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{order.order_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.media_type}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.cancel_flag}</TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <StatusBadge status={order.operation} />
                       </TableCell>
-                      <TableCell className="font-medium">{order.content_title}</TableCell>
-                      <TableCell>{order.theatre_name || order.qw_theatre_name}</TableCell>
-                      <TableCell>{order.theatre_city || order.qw_theatre_city}, {order.theatre_state || order.qw_theatre_state}</TableCell>
-                      <TableCell className="text-sm">
-                        {order.playdate_begin} to {order.playdate_end}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{order.booker_name}</p>
-                          <p className="text-sm text-muted-foreground">{order.booker_email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{order.studio_name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.playdate_begin}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.playdate_end}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.hold_key_flag}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.tmc_media_order_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.tmc_theatre_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.note}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.screening_screen_no}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.screening_time}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.do_not_ship}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.ship_hold_type}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.delivery_method}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.return_method}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.is_no_key}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.booker_name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.booker_phone}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.booker_email}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.content_id}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{order.content_title}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.package_uuid}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.film_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.chain_name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_address1}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_city}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_state}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_postal_code}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.theatre_country}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_identifier}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_theatre_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_theatre_name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_theatre_city}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_theatre_state}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_theatre_country}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.studio_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.studio_name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_company_id}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.qw_company_name}</TableCell>
                     </TableRow>
                   ))
                 )}

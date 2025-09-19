@@ -46,12 +46,29 @@ const CplManagementTab = () => {
         try {
           const text = e.target?.result as string;
           const parsedData = parseCSV(text);
-          setCplData(parsedData);
+          console.log("Parsed CSV data:", parsedData.slice(0, 3)); // Debug: show first 3 rows
+          console.log("CSV headers:", Object.keys(parsedData[0] || {})); // Debug: show headers
+          
+          // Try to map common column names to expected format
+          const mappedData = parsedData.map(row => ({
+            content_id: row.content_id || row.ContentID || row['Content ID'] || row.contentId || '',
+            content_title: row.content_title || row.ContentTitle || row['Content Title'] || row.contentTitle || row.title || row.Title || '',
+            film_id: row.film_id || row.FilmID || row['Film ID'] || row.filmId || '',
+            package_uuid: row.package_uuid || row.PackageUUID || row['Package UUID'] || row.packageUuid || '',
+            cpl_list: row.cpl_list || row.CPLList || row['CPL List'] || row.cplList || '',
+            updated_by: row.updated_by || row.UpdatedBy || row['Updated By'] || row.updatedBy || '',
+            updated_on: row.updated_on || row.UpdatedOn || row['Updated On'] || row.updatedOn || '',
+            booking_count: row.booking_count || row.BookingCount || row['Booking Count'] || row.bookingCount || 0
+          }));
+          
+          console.log("Mapped data:", mappedData.slice(0, 3)); // Debug: show first 3 mapped rows
+          setCplData(mappedData);
           toast({
             title: "File uploaded successfully",
-            description: `Loaded ${parsedData.length} records from ${file.name}`,
+            description: `Loaded ${mappedData.length} records from ${file.name}`,
           });
         } catch (error) {
+          console.error("Error parsing file:", error);
           toast({
             title: "Error parsing file",
             description: "Please check the file format and try again.",
@@ -221,8 +238,18 @@ const CplManagementTab = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                      {cplData.length === 0 ? "Please upload a CSV file to view CPL data" : "No data found matching your search"}
+                    <TableCell colSpan={8} className="text-center py-8">
+                      {cplData.length === 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-muted-foreground">Please upload a CSV file to view CPL data</p>
+                          <p className="text-xs text-muted-foreground">Expected columns: content_id, content_title, film_id, package_uuid, cpl_list</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-muted-foreground">No data found matching your search</p>
+                          <p className="text-xs text-muted-foreground">Total records loaded: {cplData.length}</p>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 )}

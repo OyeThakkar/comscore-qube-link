@@ -14,7 +14,153 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      orders: {
+        Row: {
+          booker_email: string | null
+          booker_name: string | null
+          booker_phone: string | null
+          cancel_flag: string | null
+          chain_name: string | null
+          content_id: string | null
+          content_title: string | null
+          created_at: string
+          delivery_method: string | null
+          do_not_ship: string | null
+          film_id: string | null
+          hold_key_flag: string | null
+          id: string
+          is_no_key: string | null
+          media_type: string | null
+          note: string | null
+          operation: string | null
+          order_id: string | null
+          package_uuid: string | null
+          playdate_begin: string | null
+          playdate_end: string | null
+          qw_company_id: string | null
+          qw_company_name: string | null
+          qw_identifier: string | null
+          qw_theatre_city: string | null
+          qw_theatre_country: string | null
+          qw_theatre_id: string | null
+          qw_theatre_name: string | null
+          qw_theatre_state: string | null
+          return_method: string | null
+          screening_screen_no: string | null
+          screening_time: string | null
+          ship_hold_type: string | null
+          studio_id: string | null
+          studio_name: string | null
+          theatre_address1: string | null
+          theatre_city: string | null
+          theatre_country: string | null
+          theatre_id: string | null
+          theatre_name: string | null
+          theatre_postal_code: string | null
+          theatre_state: string | null
+          tmc_media_order_id: string | null
+          tmc_theatre_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          booker_email?: string | null
+          booker_name?: string | null
+          booker_phone?: string | null
+          cancel_flag?: string | null
+          chain_name?: string | null
+          content_id?: string | null
+          content_title?: string | null
+          created_at?: string
+          delivery_method?: string | null
+          do_not_ship?: string | null
+          film_id?: string | null
+          hold_key_flag?: string | null
+          id?: string
+          is_no_key?: string | null
+          media_type?: string | null
+          note?: string | null
+          operation?: string | null
+          order_id?: string | null
+          package_uuid?: string | null
+          playdate_begin?: string | null
+          playdate_end?: string | null
+          qw_company_id?: string | null
+          qw_company_name?: string | null
+          qw_identifier?: string | null
+          qw_theatre_city?: string | null
+          qw_theatre_country?: string | null
+          qw_theatre_id?: string | null
+          qw_theatre_name?: string | null
+          qw_theatre_state?: string | null
+          return_method?: string | null
+          screening_screen_no?: string | null
+          screening_time?: string | null
+          ship_hold_type?: string | null
+          studio_id?: string | null
+          studio_name?: string | null
+          theatre_address1?: string | null
+          theatre_city?: string | null
+          theatre_country?: string | null
+          theatre_id?: string | null
+          theatre_name?: string | null
+          theatre_postal_code?: string | null
+          theatre_state?: string | null
+          tmc_media_order_id?: string | null
+          tmc_theatre_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          booker_email?: string | null
+          booker_name?: string | null
+          booker_phone?: string | null
+          cancel_flag?: string | null
+          chain_name?: string | null
+          content_id?: string | null
+          content_title?: string | null
+          created_at?: string
+          delivery_method?: string | null
+          do_not_ship?: string | null
+          film_id?: string | null
+          hold_key_flag?: string | null
+          id?: string
+          is_no_key?: string | null
+          media_type?: string | null
+          note?: string | null
+          operation?: string | null
+          order_id?: string | null
+          package_uuid?: string | null
+          playdate_begin?: string | null
+          playdate_end?: string | null
+          qw_company_id?: string | null
+          qw_company_name?: string | null
+          qw_identifier?: string | null
+          qw_theatre_city?: string | null
+          qw_theatre_country?: string | null
+          qw_theatre_id?: string | null
+          qw_theatre_name?: string | null
+          qw_theatre_state?: string | null
+          return_method?: string | null
+          screening_screen_no?: string | null
+          screening_time?: string | null
+          ship_hold_type?: string | null
+          studio_id?: string | null
+          studio_name?: string | null
+          theatre_address1?: string | null
+          theatre_city?: string | null
+          theatre_country?: string | null
+          theatre_id?: string | null
+          theatre_name?: string | null
+          theatre_postal_code?: string | null
+          theatre_state?: string | null
+          tmc_media_order_id?: string | null
+          tmc_theatre_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

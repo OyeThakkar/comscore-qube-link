@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, Search, Filter, Download } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 // Mock data for demonstration
 const mockOrders = [
@@ -65,7 +67,37 @@ const OrdersTab = () => {
     cancelled: 0
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Load existing orders on component mount
+  useEffect(() => {
+    const loadOrders = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setOrders(data || []);
+      } catch (error) {
+        console.error('Error loading orders:', error);
+        toast({
+          title: "Error loading orders",
+          description: "Could not load existing orders from database.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, [user, toast]);
 
   const parseCSV = (text: string) => {
     const lines = text.split('\n');
@@ -85,14 +117,14 @@ const OrdersTab = () => {
     return rows;
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (file && user) {
       setSelectedFile(file);
       setIsProcessing(true);
       
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const text = e.target?.result as string;
           const parsedOrders = parseCSV(text);
@@ -103,17 +135,41 @@ const OrdersTab = () => {
             updated: parsedOrders.filter(o => o.operation?.toLowerCase() === 'update').length,
             cancelled: parsedOrders.filter(o => o.operation?.toLowerCase() === 'cancel').length
           };
+
+          // Save orders to Supabase
+          const ordersToInsert = parsedOrders.map(order => ({
+            ...order,
+            user_id: user.id,
+            playdate_begin: order.playdate_begin ? new Date(order.playdate_begin).toISOString().split('T')[0] : null,
+            playdate_end: order.playdate_end ? new Date(order.playdate_end).toISOString().split('T')[0] : null
+          }));
+
+          const { data, error } = await supabase
+            .from('orders')
+            .insert(ordersToInsert)
+            .select();
+
+          if (error) throw error;
           
-          setOrders(parsedOrders);
+          // Reload orders from database to show updated data
+          const { data: allOrders, error: loadError } = await supabase
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (loadError) throw loadError;
+          
+          setOrders(allOrders || []);
           setUploadStats(stats);
           setIsProcessing(false);
           
           toast({
             title: "File uploaded successfully",
-            description: `Processed ${file.name} - ${parsedOrders.length} orders total`,
+            description: `Processed ${file.name} - ${parsedOrders.length} orders saved to database`,
           });
         } catch (error) {
           setIsProcessing(false);
+          console.error('Error processing file:', error);
           toast({
             title: "Error processing file",
             description: "Please check the CSV format and try again.",
@@ -255,7 +311,13 @@ const OrdersTab = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={42} className="text-center py-8 text-muted-foreground">
+                      Loading orders...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredOrders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={42} className="text-center py-8 text-muted-foreground">
                       No orders found. Upload a CSV file to get started.

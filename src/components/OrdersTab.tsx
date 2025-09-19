@@ -129,20 +129,35 @@ const OrdersTab = () => {
           const text = e.target?.result as string;
           const parsedOrders = parseCSV(text);
           
-          // Count operations
+          // Count operations (normalize whitespace/casing)
+          const normalizeOp = (op: any) => (op ?? '').toString().trim().toLowerCase();
           const stats = {
-            inserted: parsedOrders.filter(o => o.operation?.toLowerCase() === 'insert').length,
-            updated: parsedOrders.filter(o => o.operation?.toLowerCase() === 'update').length,
-            cancelled: parsedOrders.filter(o => o.operation?.toLowerCase() === 'cancel').length
+            inserted: parsedOrders.filter(o => normalizeOp(o.operation) === 'insert').length,
+            updated: parsedOrders.filter(o => normalizeOp(o.operation) === 'update').length,
+            cancelled: parsedOrders.filter(o => normalizeOp(o.operation) === 'cancel').length,
           };
 
           // Save orders to Supabase
-          const ordersToInsert = parsedOrders.map(order => ({
-            ...order,
-            user_id: user.id,
-            playdate_begin: order.playdate_begin ? new Date(order.playdate_begin).toISOString().split('T')[0] : null,
-            playdate_end: order.playdate_end ? new Date(order.playdate_end).toISOString().split('T')[0] : null
-          }));
+          const allowedKeys = [
+            'playdate_end','playdate_begin','tmc_media_order_id','tmc_theatre_id','note','screening_screen_no','screening_time','do_not_ship','ship_hold_type','delivery_method','return_method','is_no_key','booker_name','booker_phone','booker_email','content_id','content_title','package_uuid','film_id','theatre_id','theatre_name','chain_name','theatre_address1','theatre_city','theatre_state','theatre_postal_code','theatre_country','qw_identifier','qw_theatre_id','qw_theatre_name','qw_theatre_city','qw_theatre_state','qw_theatre_country','studio_name','qw_company_id','qw_company_name','studio_id','order_id','media_type','cancel_flag','operation','hold_key_flag'
+          ] as const;
+
+          const ordersToInsert = parsedOrders.map((order) => {
+            const cleaned: any = { user_id: user.id };
+            allowedKeys.forEach((key) => {
+              const value = order[key as keyof typeof order];
+              if (key === 'playdate_begin' || key === 'playdate_end') {
+                cleaned[key] = value ? new Date(value).toISOString().split('T')[0] : null;
+              } else if (typeof value === 'string') {
+                cleaned[key] = value.trim();
+              } else if (value !== undefined) {
+                cleaned[key] = value;
+              } else {
+                cleaned[key] = null;
+              }
+            });
+            return cleaned;
+          });
 
           const { data, error } = await supabase
             .from('orders')
@@ -167,12 +182,12 @@ const OrdersTab = () => {
             title: "File uploaded successfully",
             description: `Processed ${file.name} - ${parsedOrders.length} orders saved to database`,
           });
-        } catch (error) {
+        } catch (error: any) {
           setIsProcessing(false);
           console.error('Error processing file:', error);
           toast({
             title: "Error processing file",
-            description: "Please check the CSV format and try again.",
+            description: error?.message ?? 'Unexpected error. Please ensure you are signed in and the CSV headers match the expected schema.',
             variant: "destructive"
           });
         }

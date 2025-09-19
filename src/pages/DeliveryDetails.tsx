@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Search, RefreshCw, Package } from "lucide-react";
+import { ArrowLeft, Search, RefreshCw, Package, Save } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,9 @@ const DeliveryDetails = () => {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [contentInfo, setContentInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [bulkBookingRef, setBulkBookingRef] = useState("");
+  const [bookingRefs, setBookingRefs] = useState<{[key: string]: string}>({});
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -36,6 +39,15 @@ const DeliveryDetails = () => {
       if (error) throw error;
 
       setDeliveries(data || []);
+      
+      // Initialize booking refs from existing data
+      const refs: {[key: string]: string} = {};
+      data?.forEach(delivery => {
+        if (delivery.booking_ref) {
+          refs[delivery.id] = delivery.booking_ref;
+        }
+      });
+      setBookingRefs(refs);
       
       // Set content info from first record
       if (data && data.length > 0) {
@@ -85,6 +97,112 @@ const DeliveryDetails = () => {
       order.theatre_country
     ].filter(Boolean);
     return parts.length > 0 ? ` (${parts.join(', ')})` : '';
+  };
+
+  const handleBulkBookingRefApply = async () => {
+    if (!bulkBookingRef.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a booking reference",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updates = filteredDeliveries.map(delivery => ({
+        ...delivery,
+        booking_ref: bulkBookingRef,
+        booking_created_at: new Date().toISOString()
+      }));
+
+      const { error } = await supabase
+        .from('orders')
+        .upsert(updates);
+
+      if (error) throw error;
+
+      // Update local state
+      const newBookingRefs: {[key: string]: string} = {};
+      filteredDeliveries.forEach(delivery => {
+        newBookingRefs[delivery.id] = bulkBookingRef;
+      });
+      setBookingRefs(prev => ({ ...prev, ...newBookingRefs }));
+
+      toast({
+        title: "Success",
+        description: `Applied booking reference to ${filteredDeliveries.length} deliveries`
+      });
+
+      setBulkBookingRef("");
+      fetchDeliveries();
+    } catch (error: any) {
+      console.error('Error updating booking references:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update booking references",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleIndividualBookingRefChange = (deliveryId: string, value: string) => {
+    setBookingRefs(prev => ({ ...prev, [deliveryId]: value }));
+  };
+
+  const saveIndividualBookingRef = async (deliveryId: string) => {
+    const bookingRef = bookingRefs[deliveryId];
+    if (!bookingRef?.trim()) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          booking_ref: bookingRef,
+          booking_created_at: new Date().toISOString()
+        })
+        .eq('id', deliveryId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Booking reference updated"
+      });
+
+      fetchDeliveries();
+    } catch (error: any) {
+      console.error('Error updating booking reference:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update booking reference",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getDeliveryDetails = (delivery: any, deliveryType: string) => {
+    if (deliveryType === 'WireTAP') {
+      return (
+        <div className="space-y-1 text-sm">
+          <div><span className="font-medium">Serial:</span> {delivery.wiretap_serial_number || 'N/A'}</div>
+          <div><span className="font-medium">Tracking:</span> {delivery.tracking_id || 'N/A'}</div>
+        </div>
+      );
+    } else if (deliveryType === 'Electronic - Partner') {
+      return (
+        <div className="text-sm">
+          <span className="font-medium">Partner:</span> {delivery.partner_name || 'N/A'}
+        </div>
+      );
+    }
+    return <span className="text-muted-foreground">-</span>;
   };
 
   const filteredDeliveries = deliveries.filter(delivery => 
@@ -182,6 +300,31 @@ const DeliveryDetails = () => {
             </CardHeader>
           </Card>
 
+          {/* Bulk Booking Reference */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bulk Booking Reference</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <Input
+                  placeholder="Enter booking reference to apply to all visible deliveries..."
+                  value={bulkBookingRef}
+                  onChange={(e) => setBulkBookingRef(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={handleBulkBookingRefApply}
+                  disabled={isSaving || !bulkBookingRef.trim() || filteredDeliveries.length === 0}
+                  className="flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Apply to {filteredDeliveries.length} deliveries
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Deliveries Table */}
           <Card>
             <CardContent className="p-0">
@@ -241,21 +384,39 @@ const DeliveryDetails = () => {
                           <TableCell>
                             <StatusBadge status={getDeliveryStatus(delivery)} />
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            <div className="space-y-1">
-                              <div>WireTAP: {Math.random().toString(36).substr(2, 8).toUpperCase()}</div>
-                              <div>Track: {Math.random().toString(36).substr(2, 10).toUpperCase()}</div>
+                          <TableCell>
+                            {getDeliveryDetails(delivery, getDeliveryType(delivery.delivery_method))}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Input 
+                                placeholder="Enter booking ref..."
+                                value={bookingRefs[delivery.id] || ''}
+                                onChange={(e) => handleIndividualBookingRefChange(delivery.id, e.target.value)}
+                                className="w-32 h-8 text-sm"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    saveIndividualBookingRef(delivery.id);
+                                  }
+                                }}
+                              />
+                              {bookingRefs[delivery.id] && bookingRefs[delivery.id] !== delivery.booking_ref && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => saveIndividualBookingRef(delivery.id)}
+                                  disabled={isSaving}
+                                  className="h-8 px-2"
+                                >
+                                  <Save className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Input 
-                              placeholder="Enter booking ref..."
-                              className="w-32 h-8 text-sm"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {delivery.created_at ? 
-                              new Date(delivery.created_at).toLocaleDateString() : '-'}
+                            {delivery.booking_created_at ? 
+                              new Date(delivery.booking_created_at).toLocaleDateString() : 
+                              (delivery.created_at ? new Date(delivery.created_at).toLocaleDateString() : '-')}
                           </TableCell>
                         </TableRow>
                       ))

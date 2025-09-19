@@ -55,6 +55,8 @@ export type Database = {
           booker_email: string | null
           booker_name: string | null
           booker_phone: string | null
+          booking_created_at: string | null
+          booking_ref: string | null
           cancel_flag: string | null
           chain_name: string | null
           content_id: string | null
@@ -71,6 +73,7 @@ export type Database = {
           operation: string | null
           order_id: string | null
           package_uuid: string | null
+          partner_name: string | null
           playdate_begin: string | null
           playdate_end: string | null
           qw_company_id: string | null
@@ -96,13 +99,17 @@ export type Database = {
           theatre_state: string | null
           tmc_media_order_id: string | null
           tmc_theatre_id: string | null
+          tracking_id: string | null
           updated_at: string
           user_id: string
+          wiretap_serial_number: string | null
         }
         Insert: {
           booker_email?: string | null
           booker_name?: string | null
           booker_phone?: string | null
+          booking_created_at?: string | null
+          booking_ref?: string | null
           cancel_flag?: string | null
           chain_name?: string | null
           content_id?: string | null
@@ -119,6 +126,7 @@ export type Database = {
           operation?: string | null
           order_id?: string | null
           package_uuid?: string | null
+          partner_name?: string | null
           playdate_begin?: string | null
           playdate_end?: string | null
           qw_company_id?: string | null
@@ -144,13 +152,17 @@ export type Database = {
           theatre_state?: string | null
           tmc_media_order_id?: string | null
           tmc_theatre_id?: string | null
+          tracking_id?: string | null
           updated_at?: string
           user_id: string
+          wiretap_serial_number?: string | null
         }
         Update: {
           booker_email?: string | null
           booker_name?: string | null
           booker_phone?: string | null
+          booking_created_at?: string | null
+          booking_ref?: string | null
           cancel_flag?: string | null
           chain_name?: string | null
           content_id?: string | null
@@ -167,6 +179,7 @@ export type Database = {
           operation?: string | null
           order_id?: string | null
           package_uuid?: string | null
+          partner_name?: string | null
           playdate_begin?: string | null
           playdate_end?: string | null
           qw_company_id?: string | null
@@ -192,8 +205,10 @@ export type Database = {
           theatre_state?: string | null
           tmc_media_order_id?: string | null
           tmc_theatre_id?: string | null
+          tracking_id?: string | null
           updated_at?: string
           user_id?: string
+          wiretap_serial_number?: string | null
         }
         Relationships: []
       }

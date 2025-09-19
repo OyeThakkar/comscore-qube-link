@@ -29,28 +29,42 @@ const CplManagementTab = () => {
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Get unique content from orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('content_id, content_title, package_uuid, film_id')
         .eq('user_id', user.id)
         .not('content_id', 'is', null)
         .not('content_title', 'is', null);
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      // Get unique combinations of content_id, content_title, package_uuid
-      const uniqueContent = data.reduce((acc: any[], order) => {
+      // Get existing CPL data
+      const { data: cplData, error: cplError } = await supabase
+        .from('cpl_management')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (cplError) throw cplError;
+
+      // Get unique combinations and merge with CPL data
+      const uniqueContent = ordersData.reduce((acc: any[], order) => {
         const key = `${order.content_id}-${order.package_uuid}`;
         if (!acc.find(item => `${item.content_id}-${item.package_uuid}` === key)) {
+          // Find existing CPL data for this combination
+          const existingCpl = cplData?.find(cpl => 
+            cpl.content_id === order.content_id && cpl.package_uuid === order.package_uuid
+          );
+          
           acc.push({
             content_id: order.content_id,
             content_title: order.content_title,
             package_uuid: order.package_uuid,
             film_id: order.film_id,
-            cpl_list: '', // Empty by default, to be managed
-            booking_count: 0, // Could be calculated from orders
-            updated_by: '',
-            updated_on: ''
+            cpl_list: existingCpl?.cpl_list || '',
+            booking_count: 0,
+            updated_by: existingCpl?.updated_at ? 'User' : '',
+            updated_on: existingCpl?.updated_at || ''
           });
         }
         return acc;
@@ -81,23 +95,49 @@ const CplManagementTab = () => {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
-    // Update the CPL data in the local state
-    setCplData(prevData => 
-      prevData.map(item => 
-        item.content_id === editingItem?.content_id && item.package_uuid === editingItem?.package_uuid
-          ? { ...item, cpl_list: editingCpl }
-          : item
-      )
-    );
+  const handleSave = async () => {
+    if (!user || !editingItem) return;
     
-    toast({
-      title: "CPL updated successfully",
-      description: `Updated CPL list for content ${editingItem?.content_id}`,
-    });
-    setDialogOpen(false);
-    setEditingItem(null);
-    setEditingCpl("");
+    try {
+      const { error } = await supabase
+        .from('cpl_management')
+        .upsert({
+          user_id: user.id,
+          content_id: editingItem.content_id,
+          content_title: editingItem.content_title,
+          package_uuid: editingItem.package_uuid,
+          film_id: editingItem.film_id,
+          cpl_list: editingCpl
+        }, {
+          onConflict: 'user_id,content_id,package_uuid'
+        });
+
+      if (error) throw error;
+
+      // Update the CPL data in the local state
+      setCplData(prevData => 
+        prevData.map(item => 
+          item.content_id === editingItem?.content_id && item.package_uuid === editingItem?.package_uuid
+            ? { ...item, cpl_list: editingCpl, updated_by: 'User', updated_on: new Date().toISOString() }
+            : item
+        )
+      );
+      
+      toast({
+        title: "CPL updated successfully",
+        description: `Updated CPL list for content ${editingItem?.content_id}`,
+      });
+      setDialogOpen(false);
+      setEditingItem(null);
+      setEditingCpl("");
+    } catch (error: any) {
+      console.error('Error saving CPL data:', error);
+      toast({
+        title: "Error saving CPL data",
+        description: error.message || "Failed to save CPL data",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCancel = () => {

@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      cpl_management: {
+        Row: {
+          content_id: string
+          content_title: string | null
+          cpl_list: string | null
+          created_at: string
+          film_id: string | null
+          id: string
+          package_uuid: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_id: string
+          content_title?: string | null
+          cpl_list?: string | null
+          created_at?: string
+          film_id?: string | null
+          id?: string
+          package_uuid: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_id?: string
+          content_title?: string | null
+          cpl_list?: string | null
+          created_at?: string
+          film_id?: string | null
+          id?: string
+          package_uuid?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           booker_email: string | null

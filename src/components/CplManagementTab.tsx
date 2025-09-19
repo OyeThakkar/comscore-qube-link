@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,79 +6,72 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Edit, Save, History, Search, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Package, Edit, Save, History, Search, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const CplManagementTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingItem, setEditingItem] = useState<any>(null);
   const [editingCpl, setEditingCpl] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cplData, setCplData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const parseCSV = (text: string) => {
-    const lines = text.split('\n');
-    const headers = lines[0].split(',').map(header => header.trim());
-    const rows = [];
+  const fetchUniqueContent = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('content_id, content_title, package_uuid, film_id')
+        .eq('user_id', user.id)
+        .not('content_id', 'is', null)
+        .not('content_title', 'is', null);
 
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim()) {
-        const values = lines[i].split(',');
-        const row: any = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index]?.trim() || '';
-        });
-        rows.push(row);
-      }
-    }
-    return rows;
-  };
+      if (error) throw error;
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result as string;
-          const parsedData = parseCSV(text);
-          console.log("Parsed CSV data:", parsedData.slice(0, 3)); // Debug: show first 3 rows
-          console.log("CSV headers:", Object.keys(parsedData[0] || {})); // Debug: show headers
-          
-          // Try to map common column names to expected format
-          const mappedData = parsedData.map(row => ({
-            content_id: row.content_id || row.ContentID || row['Content ID'] || row.contentId || '',
-            content_title: row.content_title || row.ContentTitle || row['Content Title'] || row.contentTitle || row.title || row.Title || '',
-            film_id: row.film_id || row.FilmID || row['Film ID'] || row.filmId || '',
-            package_uuid: row.package_uuid || row.PackageUUID || row['Package UUID'] || row.packageUuid || '',
-            cpl_list: row.cpl_list || row.CPLList || row['CPL List'] || row.cplList || '',
-            updated_by: row.updated_by || row.UpdatedBy || row['Updated By'] || row.updatedBy || '',
-            updated_on: row.updated_on || row.UpdatedOn || row['Updated On'] || row.updatedOn || '',
-            booking_count: row.booking_count || row.BookingCount || row['Booking Count'] || row.bookingCount || 0
-          }));
-          
-          console.log("Mapped data:", mappedData.slice(0, 3)); // Debug: show first 3 mapped rows
-          setCplData(mappedData);
-          toast({
-            title: "File uploaded successfully",
-            description: `Loaded ${mappedData.length} records from ${file.name}`,
-          });
-        } catch (error) {
-          console.error("Error parsing file:", error);
-          toast({
-            title: "Error parsing file",
-            description: "Please check the file format and try again.",
-            variant: "destructive",
+      // Get unique combinations of content_id, content_title, package_uuid
+      const uniqueContent = data.reduce((acc: any[], order) => {
+        const key = `${order.content_id}-${order.package_uuid}`;
+        if (!acc.find(item => `${item.content_id}-${item.package_uuid}` === key)) {
+          acc.push({
+            content_id: order.content_id,
+            content_title: order.content_title,
+            package_uuid: order.package_uuid,
+            film_id: order.film_id,
+            cpl_list: '', // Empty by default, to be managed
+            booking_count: 0, // Could be calculated from orders
+            updated_by: '',
+            updated_on: ''
           });
         }
-      };
-      reader.readAsText(file);
+        return acc;
+      }, []);
+
+      setCplData(uniqueContent);
+    } catch (error: any) {
+      console.error('Error fetching content:', error);
+      toast({
+        title: "Error loading content",
+        description: error.message || "Failed to load content from orders",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchUniqueContent();
+    }
+  }, [user]);
 
   const handleEdit = (item: any) => {
     setEditingItem(item);
@@ -87,7 +80,7 @@ const CplManagementTab = () => {
   };
 
   const handleSave = () => {
-    // Mock save operation
+    // Mock save operation - in a real app, this would update a CPL management table
     toast({
       title: "CPL updated successfully",
       description: `Updated CPL list for content ${editingItem?.content_id}`,
@@ -111,38 +104,7 @@ const CplManagementTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* File Upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload CPL Data
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="file-upload" className="text-sm font-medium">
-                Upload CSV File
-              </Label>
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="mt-2"
-              />
-            </div>
-            {selectedFile && (
-              <div className="text-sm text-muted-foreground">
-                Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Header with Search */}
+      {/* Header with Search and Refresh */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -150,14 +112,25 @@ const CplManagementTab = () => {
               <Package className="h-5 w-5" />
               Film, Package & CPL Management
             </CardTitle>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search content..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-80"
-              />
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={fetchUniqueContent} 
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search content..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 w-80"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -167,6 +140,9 @@ const CplManagementTab = () => {
       <Card>
         <CardHeader>
           <CardTitle>Content & CPL Mapping</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Showing unique content from your orders. Use this to manage CPL assignments.
+          </p>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -178,15 +154,22 @@ const CplManagementTab = () => {
                   <TableHead>Film ID</TableHead>
                   <TableHead>Package UUID</TableHead>
                   <TableHead>CPL List</TableHead>
-                  <TableHead>Bookings</TableHead>
-                  <TableHead>Last Updated</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.length > 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Loading content...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredData.length > 0 ? (
                   filteredData.map((item, index) => (
-                    <TableRow key={item.content_id || index}>
+                    <TableRow key={`${item.content_id}-${item.package_uuid}` || index}>
                       <TableCell className="font-medium">{item.content_id || '-'}</TableCell>
                       <TableCell className="font-medium">{item.content_title || '-'}</TableCell>
                       <TableCell>{item.film_id || '-'}</TableCell>
@@ -203,21 +186,6 @@ const CplManagementTab = () => {
                             <span className="text-muted-foreground italic">No CPLs defined</span>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-primary/10 text-primary">
-                          {item.booking_count || 0}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {item.updated_on ? (
-                          <div>
-                            <p className="text-sm">{item.updated_on.split(' ')[0]}</p>
-                            <p className="text-xs text-muted-foreground">{item.updated_by}</p>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground italic">Not updated</span>
-                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -238,16 +206,16 @@ const CplManagementTab = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       {cplData.length === 0 ? (
                         <div className="space-y-2">
-                          <p className="text-muted-foreground">Please upload a CSV file to view CPL data</p>
-                          <p className="text-xs text-muted-foreground">Expected columns: content_id, content_title, film_id, package_uuid, cpl_list</p>
+                          <p className="text-muted-foreground">No content found in your orders</p>
+                          <p className="text-xs text-muted-foreground">Upload some orders first to manage CPLs</p>
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <p className="text-muted-foreground">No data found matching your search</p>
-                          <p className="text-xs text-muted-foreground">Total records loaded: {cplData.length}</p>
+                          <p className="text-muted-foreground">No content found matching your search</p>
+                          <p className="text-xs text-muted-foreground">Total unique content: {cplData.length}</p>
                         </div>
                       )}
                     </TableCell>
@@ -272,6 +240,7 @@ const CplManagementTab = () => {
                 <p><span className="font-medium">Content ID:</span> {editingItem?.content_id}</p>
                 <p><span className="font-medium">Title:</span> {editingItem?.content_title}</p>
                 <p><span className="font-medium">Film ID:</span> {editingItem?.film_id}</p>
+                <p><span className="font-medium">Package UUID:</span> {editingItem?.package_uuid}</p>
               </div>
             </div>
             <div className="space-y-2">

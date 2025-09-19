@@ -332,8 +332,7 @@ const DeliveryDetails = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Theatre Name & Location</TableHead>
-                      <TableHead>QW Theatre ID</TableHead>
+                      <TableHead>Theatre Name</TableHead>
                       <TableHead>Deliver Before</TableHead>
                       <TableHead>Delivery Type</TableHead>
                       <TableHead>Event History</TableHead>
@@ -346,7 +345,7 @@ const DeliveryDetails = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">
+                        <TableCell colSpan={8} className="text-center py-8">
                           <div className="flex items-center justify-center gap-2">
                             <RefreshCw className="h-4 w-4 animate-spin" />
                             Loading deliveries...
@@ -356,16 +355,13 @@ const DeliveryDetails = () => {
                     ) : filteredDeliveries.length > 0 ? (
                       filteredDeliveries.map((delivery, index) => (
                         <TableRow key={delivery.id || index}>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium" title={`QW Theatre ID: ${delivery.qw_theatre_id || delivery.tmc_theatre_id || 'N/A'}`}>
                             <div>
                               <div className="font-medium">{delivery.theatre_name || '-'}</div>
                               <div className="text-sm text-muted-foreground">
                                 {formatLocation(delivery)}
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {delivery.qw_theatre_id || delivery.tmc_theatre_id || '-'}
                           </TableCell>
                           <TableCell>
                             {delivery.playdate_begin ? 
@@ -422,7 +418,7 @@ const DeliveryDetails = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">
+                        <TableCell colSpan={8} className="text-center py-8">
                           <div className="space-y-2">
                             <p className="text-muted-foreground">No deliveries found</p>
                             <p className="text-xs text-muted-foreground">

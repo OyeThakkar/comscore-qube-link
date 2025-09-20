@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Search, RefreshCw, Package, Save } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,7 @@ const DeliveryDetails = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [bulkBookingRef, setBulkBookingRef] = useState("");
   const [bookingRefs, setBookingRefs] = useState<{[key: string]: string}>({});
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -99,6 +101,33 @@ const DeliveryDetails = () => {
     return parts.length > 0 ? ` (${parts.join(', ')})` : '';
   };
 
+  const filteredDeliveries = deliveries.filter(delivery => 
+    (delivery.theatre_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (delivery.qw_theatre_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (delivery.tmc_theatre_id || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(filteredDeliveries.map(delivery => delivery.id));
+      setSelectedRows(allIds);
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  const handleSelectRow = (deliveryId: string, checked: boolean) => {
+    const newSelected = new Set(selectedRows);
+    if (checked) {
+      newSelected.add(deliveryId);
+    } else {
+      newSelected.delete(deliveryId);
+    }
+    setSelectedRows(newSelected);
+  };
+
+  const selectedDeliveries = filteredDeliveries.filter(delivery => selectedRows.has(delivery.id));
+
   const handleBulkBookingRefApply = async () => {
     if (!bulkBookingRef.trim()) {
       toast({
@@ -109,9 +138,18 @@ const DeliveryDetails = () => {
       return;
     }
 
+    if (selectedDeliveries.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one delivery",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const updates = filteredDeliveries.map(delivery => ({
+      const updates = selectedDeliveries.map(delivery => ({
         ...delivery,
         booking_ref: bulkBookingRef,
         booking_created_at: new Date().toISOString()
@@ -125,17 +163,18 @@ const DeliveryDetails = () => {
 
       // Update local state
       const newBookingRefs: {[key: string]: string} = {};
-      filteredDeliveries.forEach(delivery => {
+      selectedDeliveries.forEach(delivery => {
         newBookingRefs[delivery.id] = bulkBookingRef;
       });
       setBookingRefs(prev => ({ ...prev, ...newBookingRefs }));
 
       toast({
         title: "Success",
-        description: `Applied booking reference to ${filteredDeliveries.length} deliveries`
+        description: `Applied booking reference to ${selectedDeliveries.length} deliveries`
       });
 
       setBulkBookingRef("");
+      setSelectedRows(new Set());
       fetchDeliveries();
     } catch (error: any) {
       console.error('Error updating booking references:', error);
@@ -205,11 +244,6 @@ const DeliveryDetails = () => {
     return <span className="text-muted-foreground">-</span>;
   };
 
-  const filteredDeliveries = deliveries.filter(delivery => 
-    (delivery.theatre_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (delivery.qw_theatre_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (delivery.tmc_theatre_id || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -308,20 +342,25 @@ const DeliveryDetails = () => {
             <CardContent>
               <div className="flex items-center gap-3">
                 <Input
-                  placeholder="Enter booking reference to apply to all visible deliveries..."
+                  placeholder="Enter booking reference to apply to selected deliveries..."
                   value={bulkBookingRef}
                   onChange={(e) => setBulkBookingRef(e.target.value)}
                   className="flex-1"
                 />
                 <Button 
                   onClick={handleBulkBookingRefApply}
-                  disabled={isSaving || !bulkBookingRef.trim() || filteredDeliveries.length === 0}
+                  disabled={isSaving || !bulkBookingRef.trim() || selectedDeliveries.length === 0}
                   className="flex items-center gap-2"
                 >
                   <Save className="h-4 w-4" />
-                  Apply to {filteredDeliveries.length} deliveries
+                  Apply to {selectedDeliveries.length} selected
                 </Button>
               </div>
+              {selectedRows.size > 0 && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  {selectedRows.size} deliveries selected
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -332,6 +371,13 @@ const DeliveryDetails = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={selectedRows.size === filteredDeliveries.length && filteredDeliveries.length > 0}
+                          onCheckedChange={handleSelectAll}
+                          aria-label="Select all deliveries"
+                        />
+                      </TableHead>
                       <TableHead>Theatre Name</TableHead>
                       <TableHead>Deliver Before</TableHead>
                       <TableHead>Delivery Type</TableHead>
@@ -345,7 +391,7 @@ const DeliveryDetails = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={9} className="text-center py-8">
                           <div className="flex items-center justify-center gap-2">
                             <RefreshCw className="h-4 w-4 animate-spin" />
                             Loading deliveries...
@@ -355,6 +401,13 @@ const DeliveryDetails = () => {
                     ) : filteredDeliveries.length > 0 ? (
                       filteredDeliveries.map((delivery, index) => (
                         <TableRow key={delivery.id || index}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedRows.has(delivery.id)}
+                              onCheckedChange={(checked) => handleSelectRow(delivery.id, checked as boolean)}
+                              aria-label={`Select delivery for ${delivery.theatre_name}`}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">
                             <div>
                               <div 
@@ -423,7 +476,7 @@ const DeliveryDetails = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={9} className="text-center py-8">
                           <div className="space-y-2">
                             <p className="text-muted-foreground">No deliveries found</p>
                             <p className="text-xs text-muted-foreground">

@@ -44,16 +44,20 @@ const BookingManagerTab = () => {
       if (cplError) throw cplError;
 
       // Create a map of CPL data by content_id and package_uuid
-      const cplMap = new Map();
+      const cplMap = new Map<string, string[]>();
       cplData?.forEach(cpl => {
         const key = `${cpl.content_id}-${cpl.package_uuid}`;
         if (!cplMap.has(key)) {
           cplMap.set(key, []);
         }
-        // Each row represents one CPL mapping, so add the cpl_list if it exists
-        if (cpl.cpl_list && cpl.cpl_list.trim()) {
-          cplMap.get(key).push(cpl.cpl_list.trim());
-        }
+        const list = (cpl.cpl_list || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const current = cplMap.get(key)!;
+        list.forEach((item) => {
+          if (!current.includes(item)) current.push(item);
+        });
       });
 
       // Group orders by content_id and package_uuid to create booking data
@@ -285,11 +289,9 @@ const BookingManagerTab = () => {
                               <TooltipContent>
                                 <div className="max-w-xs">
                                   <p className="font-medium mb-1">Mapped CPLs:</p>
-                                  <div className="space-y-1">
-                                    {item.cpl_list.map((cpl: string, idx: number) => (
-                                      <p key={idx} className="text-xs truncate">{cpl}</p>
-                                    ))}
-                                  </div>
+                                  <p className="text-xs whitespace-pre-wrap break-words">
+                                    {Array.isArray(item.cpl_list) ? item.cpl_list.join(', ') : String(item.cpl_list || '')}
+                                  </p>
                                 </div>
                               </TooltipContent>
                             )}

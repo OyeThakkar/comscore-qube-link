@@ -36,6 +36,9 @@ const CplManagementTab = () => {
 
       if (ordersError) throw ordersError;
 
+      console.log('Orders data from CPL Management:', ordersData);
+      console.log('Looking for content_id 3400 specifically:', ordersData?.filter(o => o.content_id === '3400' || o.order_id === '3400'));
+
       // Get existing CPL data
       const { data: cplData, error: cplError } = await supabase
         .from('cpl_management')
@@ -46,19 +49,20 @@ const CplManagementTab = () => {
 
       // Get unique combinations and merge with CPL data
       const uniqueContent = (ordersData || []).reduce((acc: any[], order: any) => {
-        const normalizedContentId = order.content_id || order.order_id || '';
-        const key = `${normalizedContentId}-${order.package_uuid || ''}`;
-        if (!acc.find(item => `${item.content_id}-${item.package_uuid}` === key)) {
+        const normalizedContentId = String(order.content_id ?? order.order_id ?? '').trim();
+        const normalizedPackage = String(order.package_uuid ?? '').trim();
+        const key = `${normalizedContentId}-${normalizedPackage}`;
+        if (!acc.find(item => `${String(item.content_id ?? '').trim()}-${String(item.package_uuid ?? '').trim()}` === key)) {
           // Find existing CPL data for this combination
           const existingCpl = cplData?.find(cpl =>
-            cpl.content_id === normalizedContentId && cpl.package_uuid === order.package_uuid
+            String(cpl.content_id ?? '').trim() === normalizedContentId && String(cpl.package_uuid ?? '').trim() === normalizedPackage
           );
           
           acc.push({
             content_id: normalizedContentId,
-            content_title: order.content_title,
-            package_uuid: order.package_uuid,
-            film_id: order.film_id,
+            content_title: (order.content_title ?? '').trim() || null,
+            package_uuid: normalizedPackage,
+            film_id: (order.film_id ?? '').trim() || null,
             cpl_list: existingCpl?.cpl_list || '',
             booking_count: 0,
             updated_by: existingCpl?.updated_at ? 'User' : '',

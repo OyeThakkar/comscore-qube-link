@@ -60,7 +60,12 @@ const Index = () => {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="h-4 w-4" />
-                {user?.email} ({userRole?.replace('_', ' ')})
+                <span>{user?.email}</span>
+                {userRole && (
+                  <span className="text-primary font-medium">
+                    ({userRole.replace('_', ' ').toUpperCase()})
+                  </span>
+                )}
               </div>
               <Button 
                 variant="outline" 

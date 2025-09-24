@@ -29,11 +29,10 @@ const CplManagementTab = () => {
     
     setIsLoading(true);
     try {
-      // Get unique content from orders
+      // Get all unique content from orders (all users)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('content_id, content_title, package_uuid, film_id')
-        .eq('user_id', user.id)
         .not('content_id', 'is', null)
         .not('content_title', 'is', null);
 

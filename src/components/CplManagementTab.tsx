@@ -33,8 +33,7 @@ const CplManagementTab = () => {
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('content_id, content_title, package_uuid, film_id')
-        .not('content_id', 'is', null)
-        .not('content_title', 'is', null);
+        .not('content_id', 'is', null);
 
       if (ordersError) throw ordersError;
 

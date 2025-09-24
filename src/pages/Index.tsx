@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Package, BarChart3, LogOut, User, Users } from "lucide-react";
+import { Upload, Package, BarChart3, LogOut, User, Users, Building2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import OrdersTab from "@/components/OrdersTab";
 import CplManagementTab from "@/components/CplManagementTab";
 import BookingManagerTab from "@/components/BookingManagerTab";
+import { DistributorManagementTab } from "@/components/DistributorManagementTab";
 import { UserManagementTab } from "@/components/UserManagementTab";
 
 const Index = () => {
@@ -83,7 +84,7 @@ const Index = () => {
 
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${hasPermission(['admin', 'client_service']) ? 'grid-cols-4' : 'grid-cols-3'} mb-6`}>
+          <TabsList className={`grid w-full ${hasPermission(['admin', 'client_service']) ? 'grid-cols-5' : 'grid-cols-4'} mb-6`}>
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Orders Management
@@ -95,6 +96,10 @@ const Index = () => {
             <TabsTrigger value="booking" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Booking Manager
+            </TabsTrigger>
+            <TabsTrigger value="distributors" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Distributor Management
             </TabsTrigger>
             {hasPermission(['admin', 'client_service']) && (
               <TabsTrigger value="users" className="flex items-center gap-2">
@@ -114,6 +119,10 @@ const Index = () => {
           
           <TabsContent value="booking">
             <BookingManagerTab />
+          </TabsContent>
+
+          <TabsContent value="distributors">
+            <DistributorManagementTab />
           </TabsContent>
 
           {hasPermission(['admin', 'client_service']) && (

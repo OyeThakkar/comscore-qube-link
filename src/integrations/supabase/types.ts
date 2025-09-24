@@ -50,6 +50,42 @@ export type Database = {
         }
         Relationships: []
       }
+      distributors: {
+        Row: {
+          created_at: string
+          id: string
+          qw_company_id: string
+          qw_company_name: string
+          qw_pat_encrypted: string | null
+          studio_id: string
+          studio_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          qw_company_id: string
+          qw_company_name: string
+          qw_pat_encrypted?: string | null
+          studio_id: string
+          studio_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          qw_company_id?: string
+          qw_company_name?: string
+          qw_pat_encrypted?: string | null
+          studio_id?: string
+          studio_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           booker_email: string | null

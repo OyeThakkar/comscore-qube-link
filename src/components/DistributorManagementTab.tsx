@@ -21,6 +21,8 @@ interface Distributor {
   qw_pat_encrypted: string | null;
   created_at: string;
   updated_at: string;
+  user_id?: string;
+  isFromOrders?: boolean;
 }
 
 type SortField = 'studio_id' | 'studio_name' | 'qw_company_name';
@@ -53,21 +55,70 @@ export const DistributorManagementTab = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
+      // Fetch existing distributors
+      const { data: existingDistributors, error: distributorsError } = await supabase
         .from('distributors')
         .select('*')
         .order('studio_name', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching distributors:', error);
+      if (distributorsError) {
+        console.error('Error fetching distributors:', distributorsError);
         toast({
           title: "Error",
           description: "Failed to fetch distributors",
           variant: "destructive",
         });
-      } else {
-        setDistributors(data || []);
+        return;
       }
+
+      // Fetch unique studio/company combinations from orders
+      const { data: orderCombinations, error: ordersError } = await supabase
+        .from('orders')
+        .select('studio_id, studio_name, qw_company_id, qw_company_name')
+        .not('studio_id', 'is', null)
+        .not('studio_name', 'is', null)
+        .not('qw_company_id', 'is', null)
+        .not('qw_company_name', 'is', null);
+
+      if (ordersError) {
+        console.error('Error fetching order combinations:', ordersError);
+      }
+
+      // Create a set of existing distributor combinations for quick lookup
+      const existingCombinations = new Set(
+        (existingDistributors || []).map(d => `${d.studio_id}-${d.qw_company_id}`)
+      );
+
+      // Find unique combinations from orders that don't exist in distributors
+      const uniqueOrderCombinations = [];
+      const seenCombinations = new Set();
+
+      (orderCombinations || []).forEach(order => {
+        const combinationKey = `${order.studio_id}-${order.qw_company_id}`;
+        if (!existingCombinations.has(combinationKey) && !seenCombinations.has(combinationKey)) {
+          seenCombinations.add(combinationKey);
+          uniqueOrderCombinations.push({
+            id: `order-${combinationKey}`, // Temporary ID to distinguish from real distributors
+            studio_id: order.studio_id,
+            studio_name: order.studio_name,
+            qw_company_id: order.qw_company_id,
+            qw_company_name: order.qw_company_name,
+            qw_pat_encrypted: null,
+            created_at: '',
+            updated_at: '',
+            user_id: '',
+            isFromOrders: true // Flag to identify these entries
+          });
+        }
+      });
+
+      // Combine existing distributors with new combinations from orders
+      const allDistributors = [
+        ...(existingDistributors || []),
+        ...uniqueOrderCombinations
+      ];
+
+      setDistributors(allDistributors);
     } catch (error) {
       console.error('Error in fetchDistributors:', error);
     } finally {
@@ -332,17 +383,37 @@ export const DistributorManagementTab = () => {
                     </TableCell>
                     {hasPermission(['admin']) && (
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedDistributor(distributor);
-                            setIsUpdatePATDialogOpen(true);
-                          }}
-                        >
-                          <Key className="h-3 w-3 mr-1" />
-                          Update PAT
-                        </Button>
+                        {distributor.isFromOrders ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setNewDistributor({
+                                studio_id: distributor.studio_id,
+                                studio_name: distributor.studio_name,
+                                qw_company_id: distributor.qw_company_id,
+                                qw_company_name: distributor.qw_company_name,
+                                qw_pat: ""
+                              });
+                              setIsAddDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Distributor
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedDistributor(distributor);
+                              setIsUpdatePATDialogOpen(true);
+                            }}
+                          >
+                            <Key className="h-3 w-3 mr-1" />
+                            Update PAT
+                          </Button>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>

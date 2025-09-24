@@ -32,11 +32,17 @@ export const useAuth = () => {
     return { error };
   };
 
+  const refreshSession = async () => {
+    const { data, error } = await supabase.auth.refreshSession();
+    return { data, error };
+  };
+
   return {
     user,
     session,
     loading,
     signOut,
+    refreshSession,
     isAuthenticated: !!user,
   };
 };

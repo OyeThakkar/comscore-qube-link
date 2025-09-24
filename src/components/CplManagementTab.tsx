@@ -29,11 +29,10 @@ const CplManagementTab = () => {
     
     setIsLoading(true);
     try {
-      // Get all unique content from orders (all users)
+      // Get all unique content from orders (all users) - include order_id fallback
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('content_id, content_title, package_uuid, film_id')
-        .not('content_id', 'is', null);
+        .select('content_id, content_title, package_uuid, film_id, order_id');
 
       if (ordersError) throw ordersError;
 
@@ -46,16 +45,17 @@ const CplManagementTab = () => {
       if (cplError) throw cplError;
 
       // Get unique combinations and merge with CPL data
-      const uniqueContent = ordersData.reduce((acc: any[], order) => {
-        const key = `${order.content_id}-${order.package_uuid}`;
+      const uniqueContent = (ordersData || []).reduce((acc: any[], order: any) => {
+        const normalizedContentId = order.content_id || order.order_id || '';
+        const key = `${normalizedContentId}-${order.package_uuid || ''}`;
         if (!acc.find(item => `${item.content_id}-${item.package_uuid}` === key)) {
           // Find existing CPL data for this combination
-          const existingCpl = cplData?.find(cpl => 
-            cpl.content_id === order.content_id && cpl.package_uuid === order.package_uuid
+          const existingCpl = cplData?.find(cpl =>
+            cpl.content_id === normalizedContentId && cpl.package_uuid === order.package_uuid
           );
           
           acc.push({
-            content_id: order.content_id,
+            content_id: normalizedContentId,
             content_title: order.content_title,
             package_uuid: order.package_uuid,
             film_id: order.film_id,

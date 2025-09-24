@@ -21,6 +21,7 @@ interface Distributor {
   qw_pat_encrypted: string | null;
   created_at: string;
   updated_at: string;
+  updated_by: string | null;
   user_id?: string;
   isFromOrders?: boolean;
 }
@@ -33,6 +34,7 @@ export const DistributorManagementTab = () => {
   const { hasPermission, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -69,6 +71,28 @@ export const DistributorManagementTab = () => {
           variant: "destructive",
         });
         return;
+      }
+
+      // Fetch profiles for updated_by mapping
+      if (existingDistributors && existingDistributors.length > 0) {
+        const updatedByIds = [...new Set(
+          existingDistributors
+            .map(d => d.updated_by)
+            .filter(Boolean)
+        )];
+
+        if (updatedByIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, name, email')
+            .in('id', updatedByIds);
+
+          const profilesMap: Record<string, string> = {};
+          profilesData?.forEach(profile => {
+            profilesMap[profile.id] = profile.name || profile.email;
+          });
+          setProfiles(profilesMap);
+        }
       }
 
       // Fetch unique studio/company combinations from orders
@@ -185,7 +209,10 @@ export const DistributorManagementTab = () => {
       
       const { error } = await supabase
         .from('distributors')
-        .update({ qw_pat_encrypted: encrypted_pat })
+        .update({ 
+          qw_pat_encrypted: encrypted_pat,
+          updated_by: user.id
+        })
         .eq('id', selectedDistributor.id);
 
       if (error) {
@@ -366,6 +393,8 @@ export const DistributorManagementTab = () => {
                     </div>
                   </TableHead>
                   <TableHead>QW PAT</TableHead>
+                  <TableHead>Updated By</TableHead>
+                  <TableHead>Updated On</TableHead>
                   {hasPermission(['admin']) && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -380,6 +409,12 @@ export const DistributorManagementTab = () => {
                       <Badge variant={distributor.qw_pat_encrypted ? "secondary" : "destructive"}>
                         {distributor.qw_pat_encrypted ? "Available" : "Not Available"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {distributor.updated_by ? (profiles[distributor.updated_by] || 'Unknown') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {distributor.updated_at ? new Date(distributor.updated_at).toLocaleDateString() : '-'}
                     </TableCell>
                     {hasPermission(['admin']) && (
                       <TableCell>
@@ -421,7 +456,7 @@ export const DistributorManagementTab = () => {
                 {filteredAndSortedDistributors.length === 0 && (
                   <TableRow>
                     <TableCell 
-                      colSpan={hasPermission(['admin']) ? 6 : 5} 
+                      colSpan={hasPermission(['admin']) ? 8 : 7} 
                       className="text-center text-muted-foreground py-8"
                     >
                       No distributors found

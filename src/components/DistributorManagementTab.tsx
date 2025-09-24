@@ -377,7 +377,7 @@ export const DistributorManagementTab = () => {
                     <TableCell>{distributor.qw_company_id}</TableCell>
                     <TableCell>{distributor.qw_company_name}</TableCell>
                     <TableCell>
-                      <Badge variant={distributor.qw_pat_encrypted ? "secondary" : "outline"}>
+                      <Badge variant={distributor.qw_pat_encrypted ? "secondary" : "destructive"}>
                         {distributor.qw_pat_encrypted ? "Available" : "Not Available"}
                       </Badge>
                     </TableCell>

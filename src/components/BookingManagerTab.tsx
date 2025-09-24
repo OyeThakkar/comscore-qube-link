@@ -11,6 +11,7 @@ import StatusBadge from "./StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const BookingManagerTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,12 +28,32 @@ const BookingManagerTab = () => {
     setIsLoading(true);
     try {
       // Fetch all orders for the user
-      const { data: orders, error } = await supabase
+      const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
+
+      // Fetch CPL data for the user
+      const { data: cplData, error: cplError } = await supabase
+        .from('cpl_management')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (cplError) throw cplError;
+
+      // Create a map of CPL data by content_id and package_uuid
+      const cplMap = new Map();
+      cplData?.forEach(cpl => {
+        const key = `${cpl.content_id}-${cpl.package_uuid}`;
+        if (!cplMap.has(key)) {
+          cplMap.set(key, []);
+        }
+        if (cpl.cpl_list) {
+          cplMap.get(key).push(cpl.cpl_list);
+        }
+      });
 
       // Group orders by content_id and package_uuid to create booking data
       const contentMap = new Map();
@@ -43,12 +64,14 @@ const BookingManagerTab = () => {
         const key = `${order.content_id}-${order.package_uuid}`;
         
         if (!contentMap.has(key)) {
+          const cplList = cplMap.get(key) || [];
           contentMap.set(key, {
             content_id: order.content_id,
             content_title: order.content_title,
             package_uuid: order.package_uuid,
             film_id: order.film_id,
-            cpl_list: "", // This would come from CPL management
+            cpl_list: cplList,
+            cpl_count: cplList.length,
             booking_count: 0,
             pending_bookings: 0,
             shipped: 0,
@@ -244,15 +267,33 @@ const BookingManagerTab = () => {
                     <TableRow key={`${item.content_id}-${item.package_uuid}` || index}>
                       <TableCell className="font-medium">{item.content_title}</TableCell>
                       <TableCell>
-                        {item.cpl_list ? (
-                          <Badge variant="outline" className="bg-status-success-bg text-status-success">
-                            CPL Mapped
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-status-error-bg text-status-error">
-                            No CPL
-                          </Badge>
-                        )}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {item.cpl_count > 0 ? (
+                                <Badge variant="outline" className="bg-status-success-bg text-status-success cursor-help">
+                                  {item.cpl_count} CPL{item.cpl_count !== 1 ? 's' : ''}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-status-error-bg text-status-error">
+                                  No CPL
+                                </Badge>
+                              )}
+                            </TooltipTrigger>
+                            {item.cpl_count > 0 && (
+                              <TooltipContent>
+                                <div className="max-w-xs">
+                                  <p className="font-medium mb-1">Mapped CPLs:</p>
+                                  <div className="space-y-1">
+                                    {item.cpl_list.map((cpl: string, idx: number) => (
+                                      <p key={idx} className="text-xs truncate">{cpl}</p>
+                                    ))}
+                                  </div>
+                                </div>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="bg-primary/10 text-primary">

@@ -50,8 +50,9 @@ const BookingManagerTab = () => {
         if (!cplMap.has(key)) {
           cplMap.set(key, []);
         }
-        if (cpl.cpl_list) {
-          cplMap.get(key).push(cpl.cpl_list);
+        // Each row represents one CPL mapping, so add the cpl_list if it exists
+        if (cpl.cpl_list && cpl.cpl_list.trim()) {
+          cplMap.get(key).push(cpl.cpl_list.trim());
         }
       });
 

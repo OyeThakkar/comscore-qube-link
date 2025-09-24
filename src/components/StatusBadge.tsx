@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
-  status: "insert" | "update" | "cancel" | "shipped" | "downloading" | "completed" | "failed" | "pending" | "delivered" | "downloaded" | "cancelled";
+  status: "insert" | "update" | "cancel" | "shipped" | "downloading" | "completed" | "failed" | "pending" | "delivered" | "downloaded" | "cancelled" | "active" | "inactive";
   className?: string;
 }
 
@@ -62,6 +62,16 @@ const StatusBadge = ({ status, className }: StatusBadgeProps) => {
       case "cancelled":
         return {
           text: "Cancelled",
+          className: "bg-status-error-bg text-status-error border-status-error/20"
+        };
+      case "active":
+        return {
+          text: "Active",
+          className: "bg-status-success-bg text-status-success border-status-success/20"
+        };
+      case "inactive":
+        return {
+          text: "Inactive",
           className: "bg-status-error-bg text-status-error border-status-error/20"
         };
       default:

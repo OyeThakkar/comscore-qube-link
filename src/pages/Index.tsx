@@ -3,15 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Package, BarChart3, LogOut, User } from "lucide-react";
+import { Upload, Package, BarChart3, LogOut, User, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import OrdersTab from "@/components/OrdersTab";
 import CplManagementTab from "@/components/CplManagementTab";
 import BookingManagerTab from "@/components/BookingManagerTab";
+import { UserManagementTab } from "@/components/UserManagementTab";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("orders");
   const { user, loading, signOut, isAuthenticated } = useAuth();
+  const { role: userRole, hasPermission, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,7 +28,7 @@ const Index = () => {
     navigate("/auth");
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -57,7 +60,7 @@ const Index = () => {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="h-4 w-4" />
-                {user?.email}
+                {user?.email} ({userRole?.replace('_', ' ')})
               </div>
               <Button 
                 variant="outline" 
@@ -75,7 +78,7 @@ const Index = () => {
 
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className={`grid w-full ${hasPermission(['admin', 'client_service']) ? 'grid-cols-4' : 'grid-cols-3'} mb-6`}>
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
               Orders Management
@@ -88,19 +91,31 @@ const Index = () => {
               <BarChart3 className="h-4 w-4" />
               Booking Manager
             </TabsTrigger>
+            {hasPermission(['admin', 'client_service']) && (
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                User Management
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="orders">
             <OrdersTab />
           </TabsContent>
-
+          
           <TabsContent value="cpl">
             <CplManagementTab />
           </TabsContent>
-
+          
           <TabsContent value="booking">
             <BookingManagerTab />
           </TabsContent>
+
+          {hasPermission(['admin', 'client_service']) && (
+            <TabsContent value="users">
+              <UserManagementTab />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>

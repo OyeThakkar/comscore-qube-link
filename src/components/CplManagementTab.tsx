@@ -29,10 +29,11 @@ const CplManagementTab = () => {
     
     setIsLoading(true);
     try {
-      // Get all unique content from orders (all users) - include order_id fallback
+      // Get all unique content from orders for current user
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('content_id, content_title, package_uuid, film_id, order_id');
+        .select('content_id, content_title, package_uuid, film_id, order_id')
+        .eq('user_id', user.id);
 
       if (ordersError) throw ordersError;
 

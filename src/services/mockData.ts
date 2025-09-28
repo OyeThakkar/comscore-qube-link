@@ -118,6 +118,14 @@ export const mockDeliveryStatuses = {
       status: "downloading" as const,
       theatre_name: "AMC Empire 25",
       progress: 75
+    },
+    {
+      booking_id: "QW-BOOK-004",
+      content_id: "CONTENT-001",
+      package_uuid: "PKG-UUID-001",
+      status: "shipped" as const,
+      theatre_name: "Cinemark Times Square",
+      progress: 100
     }
   ],
   "CONTENT-002": [
@@ -127,6 +135,21 @@ export const mockDeliveryStatuses = {
       package_uuid: "PKG-UUID-002",
       status: "pending" as const,
       theatre_name: "Cinemark Century City"
+    },
+    {
+      booking_id: "QW-BOOK-005",
+      content_id: "CONTENT-002",
+      package_uuid: "PKG-UUID-002",
+      status: "failed" as const,
+      theatre_name: "AMC Lincoln Square",
+      progress: 0
+    },
+    {
+      booking_id: "QW-BOOK-006",
+      content_id: "CONTENT-002",
+      package_uuid: "PKG-UUID-002",
+      status: "cancelled" as const,
+      theatre_name: "Regal Battery Park"
     }
   ]
 };

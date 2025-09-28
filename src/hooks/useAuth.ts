@@ -41,13 +41,23 @@ export const useAuth = () => {
   }, []);
 
   const signOut = async () => {
-    if (isDevelopmentMode) {
+    try {
+      if (isDevelopmentMode) {
+        setUser(null);
+        setSession(null);
+        return { error: null };
+      }
+      const { error } = await supabase.auth.signOut();
+      // Ensure local state is cleared immediately regardless of event timing
       setUser(null);
       setSession(null);
-      return { error: null };
+      return { error };
+    } catch (error) {
+      // Fallback: clear state even if an exception occurs
+      setUser(null);
+      setSession(null);
+      return { error } as any;
     }
-    const { error } = await supabase.auth.signOut();
-    return { error };
   };
 
   const refreshSession = async () => {

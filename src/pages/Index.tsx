@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,16 @@ const Index = () => {
   const { role: userRole, hasPermission, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate("/auth");
-    }
-  }, [loading, isAuthenticated, navigate]);
-
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
+    console.log("Sign out button clicked");
+    try {
+      await signOut();
+      console.log("Sign out completed, navigating to /auth");
+      navigate("/auth", { replace: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      navigate("/auth", { replace: true });
+    }
   };
 
   if (loading || roleLoading) {
@@ -41,7 +42,8 @@ const Index = () => {
   }
 
   if (!isAuthenticated) {
-    return null; // Will redirect to auth
+    console.log("User not authenticated, redirecting to /auth");
+    return <Navigate to="/auth" replace />;
   }
 
   return (

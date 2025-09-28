@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
+const isDevelopmentMode = import.meta.env.VITE_DEV_MODE === 'true';
+
 export type UserRole = 'admin' | 'client_service' | 'viewer';
 
 export const useUserRole = () => {
@@ -13,6 +15,13 @@ export const useUserRole = () => {
   const fetchUserRole = async () => {
     if (!user) {
       setRole(null);
+      setLoading(false);
+      return;
+    }
+
+    if (isDevelopmentMode) {
+      // Mock role for development
+      setRole('admin');
       setLoading(false);
       return;
     }
@@ -47,9 +56,9 @@ export const useUserRole = () => {
     }
   }, [user, authLoading]);
 
-  // Refresh role data every 10 seconds to catch updates
+  // Refresh role data every 10 seconds to catch updates (only in production)
   useEffect(() => {
-    if (!user || authLoading) return;
+    if (!user || authLoading || isDevelopmentMode) return;
     
     const interval = setInterval(() => {
       fetchUserRole();

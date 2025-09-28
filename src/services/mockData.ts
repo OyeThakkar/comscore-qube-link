@@ -1,7 +1,7 @@
 // Mock data for development and demo purposes
 
 export const mockUser = {
-  id: "mock-user-id",
+  id: "083379b8-b64b-4977-97fd-1fe801610f29", // Valid UUID format
   email: "demo@example.com",
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
@@ -10,7 +10,7 @@ export const mockUser = {
 export const mockOrders = [
   {
     id: "1",
-    user_id: "mock-user-id",
+    user_id: "083379b8-b64b-4977-97fd-1fe801610f29",
     content_id: "CONTENT-001",
     content_title: "Top Gun: Maverick",
     package_uuid: "PKG-UUID-001",
@@ -33,7 +33,7 @@ export const mockOrders = [
   },
   {
     id: "2",
-    user_id: "mock-user-id",
+    user_id: "083379b8-b64b-4977-97fd-1fe801610f29",
     content_id: "CONTENT-001",
     content_title: "Top Gun: Maverick",
     package_uuid: "PKG-UUID-001",
@@ -56,7 +56,7 @@ export const mockOrders = [
   },
   {
     id: "3",
-    user_id: "mock-user-id",
+    user_id: "083379b8-b64b-4977-97fd-1fe801610f29",
     content_id: "CONTENT-002",
     content_title: "Avatar: The Way of Water",
     package_uuid: "PKG-UUID-002",
@@ -82,7 +82,7 @@ export const mockOrders = [
 export const mockCplData = [
   {
     id: "1",
-    user_id: "mock-user-id",
+    user_id: "083379b8-b64b-4977-97fd-1fe801610f29",
     content_id: "CONTENT-001",
     package_uuid: "PKG-UUID-001",
     cpl_list: "CPL-001-2K-EN, CPL-001-4K-EN, CPL-001-2K-ES",
@@ -91,7 +91,7 @@ export const mockCplData = [
   },
   {
     id: "2",
-    user_id: "mock-user-id",
+    user_id: "083379b8-b64b-4977-97fd-1fe801610f29",
     content_id: "CONTENT-002",
     package_uuid: "PKG-UUID-002",
     cpl_list: "CPL-002-2K-EN, CPL-002-4K-EN",

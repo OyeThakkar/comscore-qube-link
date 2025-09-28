@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,42 +6,78 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { BarChart3, Search, RefreshCw, Eye, TrendingUp, Package, AlertCircle } from "lucide-react";
+import { BarChart3, Search, RefreshCw, Eye, TrendingUp, Package, AlertCircle, Send } from "lucide-react";
 import StatusBadge from "./StatusBadge";
+import ApiSettingsDialog from "./ApiSettingsDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { qubeWireApi, type DeliveryStatus } from "@/services/qubeWireApi";
+import { mockOrders, mockCplData, mockDeliveryStatuses } from "@/services/mockData";
+
+const isDevelopmentMode = import.meta.env.VITE_DEV_MODE === 'true';
+
+interface BookingData {
+  content_id: string;
+  content_title: string;
+  package_uuid: string;
+  film_id: string;
+  cpl_list: string[];
+  cpl_count: number;
+  booking_count: number;
+  pending_bookings: number;
+  shipped: number;
+  downloading: number;
+  completed: number;
+  cancelled: number;
+  updated_on: string;
+  completion_rate: number;
+  orders: any[];
+  qube_wire_status?: DeliveryStatus[];
+}
 
 const BookingManagerTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
-  const [bookingData, setBookingData] = useState<any[]>([]);
+  const [bookingData, setBookingData] = useState<BookingData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreatingBookings, setIsCreatingBookings] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const fetchBookingData = async () => {
+  const fetchBookingData = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
     try {
-      // Fetch all orders for the user
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id);
+      let orders, cplData;
 
-      if (ordersError) throw ordersError;
+      if (isDevelopmentMode) {
+        // Use mock data in development mode
+        orders = mockOrders;
+        cplData = mockCplData;
+      } else {
+        // Fetch all orders for the user
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', user.id);
 
-      // Fetch CPL data for the user
-      const { data: cplData, error: cplError } = await supabase
-        .from('cpl_management')
-        .select('*')
-        .eq('user_id', user.id);
+        if (ordersError) throw ordersError;
 
-      if (cplError) throw cplError;
+        // Fetch CPL data for the user
+        const { data: cplDataResult, error: cplError } = await supabase
+          .from('cpl_management')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (cplError) throw cplError;
+
+        orders = ordersData;
+        cplData = cplDataResult;
+      }
 
       // Create a map of CPL data by content_id and package_uuid
       const cplMap = new Map<string, string[]>();
@@ -52,16 +88,16 @@ const BookingManagerTab = () => {
         }
         const list = (cpl.cpl_list || '')
           .split(',')
-          .map((s) => s.trim())
+          .map((s: string) => s.trim())
           .filter(Boolean);
         const current = cplMap.get(key)!;
-        list.forEach((item) => {
+        list.forEach((item: string) => {
           if (!current.includes(item)) current.push(item);
         });
       });
 
       // Group orders by content_id and package_uuid to create booking data
-      const contentMap = new Map();
+      const contentMap = new Map<string, BookingData>();
       
       orders?.forEach(order => {
         if (!order.content_id || !order.content_title) return;
@@ -89,7 +125,7 @@ const BookingManagerTab = () => {
           });
         }
         
-        const content = contentMap.get(key);
+        const content = contentMap.get(key)!;
         content.orders.push(order);
         content.booking_count++;
         
@@ -114,17 +150,95 @@ const BookingManagerTab = () => {
         }
       });
 
-      // Calculate completion rates and final status counts
-      const bookingArray = Array.from(contentMap.values()).map(content => {
-        // Mock some completed deliveries for demonstration
-        content.completed = Math.floor(content.shipped * 0.8);
-        content.downloading = content.shipped - content.completed;
-        content.completion_rate = content.booking_count > 0 
-          ? Math.round((content.completed / content.booking_count) * 100) 
-          : 0;
-        
-        return content;
-      });
+      // Fetch real-time status from Qube Wire API for each content
+      const bookingArray = Array.from(contentMap.values());
+      
+      // Try to fetch delivery statuses from Qube Wire API
+      try {
+        if (isDevelopmentMode) {
+          // Use mock delivery statuses in development mode
+          bookingArray.forEach(content => {
+            const mockStatuses = mockDeliveryStatuses[content.content_id as keyof typeof mockDeliveryStatuses];
+            if (mockStatuses) {
+              content.qube_wire_status = mockStatuses;
+              
+              // Update counts based on mock API data
+              content.completed = mockStatuses.filter(s => s.status === 'completed').length;
+              content.shipped = mockStatuses.filter(s => s.status === 'shipped').length;
+              content.downloading = mockStatuses.filter(s => s.status === 'downloading').length;
+              content.pending_bookings = mockStatuses.filter(s => s.status === 'pending').length;
+              content.cancelled = mockStatuses.filter(s => s.status === 'cancelled' || s.status === 'failed').length;
+              
+              content.completion_rate = content.booking_count > 0 
+                ? Math.round((content.completed / content.booking_count) * 100) 
+                : 0;
+            } else {
+              // Fallback mock calculation
+              content.completed = Math.floor(content.shipped * 0.8);
+              content.downloading = content.shipped - content.completed;
+              content.completion_rate = content.booking_count > 0 
+                ? Math.round((content.completed / content.booking_count) * 100) 
+                : 0;
+            }
+          });
+        } else {
+          const token = localStorage.getItem('qube_wire_token');
+          if (token) {
+            qubeWireApi.setToken(token);
+            
+            for (const content of bookingArray) {
+              try {
+                const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(
+                  content.content_id, 
+                  content.package_uuid
+                );
+                
+                if (deliveryStatuses && deliveryStatuses.length > 0) {
+                  content.qube_wire_status = deliveryStatuses;
+                  
+                  // Update counts based on real API data
+                  content.completed = deliveryStatuses.filter(s => s.status === 'completed').length;
+                  content.shipped = deliveryStatuses.filter(s => s.status === 'shipped').length;
+                  content.downloading = deliveryStatuses.filter(s => s.status === 'downloading').length;
+                  content.pending_bookings = deliveryStatuses.filter(s => s.status === 'pending').length;
+                  content.cancelled = deliveryStatuses.filter(s => s.status === 'cancelled' || s.status === 'failed').length;
+                  
+                  content.completion_rate = content.booking_count > 0 
+                    ? Math.round((content.completed / content.booking_count) * 100) 
+                    : 0;
+                }
+              } catch (apiError) {
+                console.warn(`Failed to fetch delivery status for ${content.content_id}:`, apiError);
+                // Fall back to mock calculation
+                content.completed = Math.floor(content.shipped * 0.8);
+                content.downloading = content.shipped - content.completed;
+                content.completion_rate = content.booking_count > 0 
+                  ? Math.round((content.completed / content.booking_count) * 100) 
+                  : 0;
+              }
+            }
+          } else {
+            // No API token - use mock data
+            bookingArray.forEach(content => {
+              content.completed = Math.floor(content.shipped * 0.8);
+              content.downloading = content.shipped - content.completed;
+              content.completion_rate = content.booking_count > 0 
+                ? Math.round((content.completed / content.booking_count) * 100) 
+                : 0;
+            });
+          }
+        }
+      } catch (apiError) {
+        console.warn('Failed to fetch delivery statuses from Qube Wire API:', apiError);
+        // Use mock calculation as fallback
+        bookingArray.forEach(content => {
+          content.completed = Math.floor(content.shipped * 0.8);
+          content.downloading = content.shipped - content.completed;
+          content.completion_rate = content.booking_count > 0 
+            ? Math.round((content.completed / content.booking_count) * 100) 
+            : 0;
+        });
+      }
 
       setBookingData(bookingArray);
     } catch (error: any) {
@@ -137,15 +251,116 @@ const BookingManagerTab = () => {
     } finally {
       setIsLoading(false);
     }
+  }, [user, toast]);
+
+  const createBookingsForContent = async (contentData: BookingData) => {
+    if (isDevelopmentMode) {
+      // Mock booking creation in development mode
+      setIsCreatingBookings(true);
+      
+      setTimeout(() => {
+        toast({
+          title: "Bookings Created (Demo)",
+          description: `Successfully created ${contentData.orders.length} booking${contentData.orders.length !== 1 ? 's' : ''} for ${contentData.content_title}`,
+        });
+        
+        // Refresh the booking data to show updated statuses
+        fetchBookingData();
+        setIsCreatingBookings(false);
+      }, 2000);
+      
+      return;
+    }
+
+    const token = localStorage.getItem('qube_wire_token');
+    if (!token) {
+      toast({
+        title: "API Token Required",
+        description: "Please configure your Qube Wire Personal Access Token in API Settings",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCreatingBookings(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      qubeWireApi.setToken(token);
+
+      // Create bookings for each order in this content
+      for (const order of contentData.orders) {
+        try {
+          const bookingRequest = {
+            content_id: order.content_id,
+            package_uuid: order.package_uuid,
+            film_id: order.film_id,
+            theatre_id: order.theatre_id,
+            theatre_name: order.theatre_name,
+            playdate_begin: order.playdate_begin,
+            playdate_end: order.playdate_end,
+            booker_name: order.booker_name,
+            booker_email: order.booker_email,
+            studio_name: order.studio_name,
+            delivery_method: order.delivery_method,
+            operation: order.operation || 'insert'
+          };
+
+          const response = await qubeWireApi.createBooking(bookingRequest);
+          
+          // Update the order with booking reference
+          if (response.booking_id) {
+            await supabase
+              .from('orders')
+              .update({ 
+                booking_ref: response.booking_id,
+                booking_created_at: new Date().toISOString()
+              })
+              .eq('id', order.id);
+          }
+
+          successCount++;
+        } catch (error: any) {
+          console.error(`Failed to create booking for order ${order.id}:`, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Bookings Created",
+          description: `Successfully created ${successCount} booking${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
+        });
+        
+        // Refresh the booking data
+        fetchBookingData();
+      } else {
+        toast({
+          title: "Booking Creation Failed",
+          description: "No bookings were created successfully",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating bookings:', error);
+      toast({
+        title: "Error creating bookings",
+        description: error.message || "Failed to create bookings",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingBookings(false);
+    }
   };
 
   useEffect(() => {
     if (user) {
       fetchBookingData();
     }
-  }, [user]);
+  }, [user, fetchBookingData]);
 
-  const handleViewDetails = (item: any) => {
+  const handleViewDetails = (item: BookingData) => {
     navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
   };
 
@@ -222,6 +437,7 @@ const BookingManagerTab = () => {
               Booking Status Overview
             </CardTitle>
             <div className="flex items-center gap-2">
+              <ApiSettingsDialog />
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -345,15 +561,27 @@ const BookingManagerTab = () => {
                         {item.updated_on ? new Date(item.updated_on).toLocaleDateString() : '-'}
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-8"
-                          onClick={() => handleViewDetails(item)}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          Details
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8"
+                            onClick={() => handleViewDetails(item)}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            Details
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="default" 
+                            className="h-8"
+                            onClick={() => createBookingsForContent(item)}
+                            disabled={isCreatingBookings || item.cpl_count === 0}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Create Booking
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

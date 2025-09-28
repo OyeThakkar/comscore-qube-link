@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,11 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Search, RefreshCw, Package, Save } from "lucide-react";
+import { ArrowLeft, Search, RefreshCw, Package, Save, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import StatusBadge from "@/components/StatusBadge";
+import ApiSettingsDialog from "@/components/ApiSettingsDialog";
+import { qubeWireApi, type DeliveryStatus } from "@/services/qubeWireApi";
+import { mockOrders, mockDeliveryStatuses } from "@/services/mockData";
+
+const isDevelopmentMode = import.meta.env.VITE_DEV_MODE === 'true';
 
 const DeliveryDetails = () => {
   const { contentId, packageUuid } = useParams();
@@ -23,28 +28,39 @@ const DeliveryDetails = () => {
   const [bulkBookingRef, setBulkBookingRef] = useState("");
   const [bookingRefs, setBookingRefs] = useState<{[key: string]: string}>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [qubeWireStatuses, setQubeWireStatuses] = useState<DeliveryStatus[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const fetchDeliveries = async () => {
+  const fetchDeliveries = useCallback(async () => {
     if (!user || !contentId || !packageUuid) return;
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('content_id', contentId)
-        .eq('package_uuid', packageUuid);
+      let deliveriesData;
 
-      if (error) throw error;
+      if (isDevelopmentMode) {
+        // Use mock data in development mode
+        deliveriesData = mockOrders.filter(order => 
+          order.content_id === contentId && order.package_uuid === packageUuid
+        );
+      } else {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('content_id', contentId)
+          .eq('package_uuid', packageUuid);
 
-      setDeliveries(data || []);
+        if (error) throw error;
+        deliveriesData = data || [];
+      }
+
+      setDeliveries(deliveriesData);
       
       // Initialize booking refs from existing data
       const refs: {[key: string]: string} = {};
-      data?.forEach(delivery => {
+      deliveriesData?.forEach(delivery => {
         if (delivery.booking_ref) {
           refs[delivery.id] = delivery.booking_ref;
         }
@@ -52,37 +68,109 @@ const DeliveryDetails = () => {
       setBookingRefs(refs);
       
       // Set content info from first record
-      if (data && data.length > 0) {
+      if (deliveriesData && deliveriesData.length > 0) {
         setContentInfo({
-          content_id: data[0].content_id,
-          content_title: data[0].content_title,
-          film_id: data[0].film_id,
-          package_uuid: data[0].package_uuid
+          content_id: deliveriesData[0].content_id,
+          content_title: deliveriesData[0].content_title,
+          film_id: deliveriesData[0].film_id,
+          package_uuid: deliveriesData[0].package_uuid
         });
       }
+
+      // Fetch real-time status from Qube Wire API
+      try {
+        if (isDevelopmentMode) {
+          // Use mock delivery statuses in development mode
+          const mockStatuses = mockDeliveryStatuses[contentId as keyof typeof mockDeliveryStatuses];
+          if (mockStatuses) {
+            setQubeWireStatuses(mockStatuses);
+          }
+        } else {
+          const token = localStorage.getItem('qube_wire_token');
+          if (token && contentId && packageUuid) {
+            qubeWireApi.setToken(token);
+            const statuses = await qubeWireApi.getDeliveryStatuses(contentId, packageUuid);
+            setQubeWireStatuses(statuses || []);
+          }
+        }
+      } catch (apiError) {
+        console.warn('Failed to fetch delivery statuses from Qube Wire API:', apiError);
+        toast({
+          title: "API Warning",
+          description: "Unable to fetch real-time delivery status from Qube Wire",
+          variant: "destructive"
+        });
+      }
+
     } catch (error: any) {
       console.error('Error fetching deliveries:', error);
       toast({
         title: "Error loading deliveries",
-        description: error.message || "Failed to load delivery data",
+        description: error.message || "Failed to load delivery information",
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, contentId, packageUuid, toast]);
 
   useEffect(() => {
     if (user && contentId && packageUuid) {
       fetchDeliveries();
     }
-  }, [user, contentId, packageUuid]);
+  }, [user, contentId, packageUuid, fetchDeliveries]);
 
   const getDeliveryStatus = (order: any): "pending" | "shipped" | "downloading" | "delivered" | "downloaded" | "cancelled" => {
-    // Mock status logic - in real app this would be based on actual delivery tracking
-    const statuses: ("pending" | "shipped" | "downloading" | "delivered" | "downloaded" | "cancelled")[] = 
-      ['pending', 'shipped', 'downloading', 'delivered', 'downloaded', 'cancelled'];
-    return statuses[Math.floor(Math.random() * statuses.length)];
+    // Check if we have real-time status from Qube Wire API
+    const qubeWireStatus = qubeWireStatuses.find(status => 
+      status.booking_id === order.booking_ref || 
+      status.theatre_name === order.theatre_name
+    );
+    
+    if (qubeWireStatus) {
+      switch (qubeWireStatus.status) {
+        case 'completed':
+          return 'delivered';
+        case 'downloading':
+          return 'downloading';
+        case 'shipped':
+          return 'shipped';
+        case 'pending':
+          return 'pending';
+        case 'cancelled':
+        case 'failed':
+          return 'cancelled';
+        default:
+          return 'pending';
+      }
+    }
+
+    // Fallback to mock status logic for development
+    if (isDevelopmentMode) {
+      // More realistic mock status based on operation
+      switch (order.operation?.toLowerCase()) {
+        case 'insert':
+          return 'pending';
+        case 'update':
+          return order.booking_ref ? 'delivered' : 'shipped';
+        case 'cancel':
+          return 'cancelled';
+        default:
+          return 'pending';
+      }
+    }
+
+    // Default fallback
+    return 'pending';
+  };
+
+  const getQubeWireProgress = (order: any): number => {
+    const qubeWireStatus = qubeWireStatuses.find(status => 
+      status.booking_id === order.booking_ref || 
+      status.theatre_name === order.theatre_name
+    );
+    
+    return qubeWireStatus?.progress || 0;
   };
 
   const getDeliveryType = (deliveryMethod: string) => {
@@ -311,6 +399,7 @@ const DeliveryDetails = () => {
               <div className="flex items-center justify-between">
                 <CardTitle>Delivery List ({filteredDeliveries.length} deliveries)</CardTitle>
                 <div className="flex items-center gap-3">
+                  <ApiSettingsDialog />
                   <Button 
                     onClick={fetchDeliveries} 
                     disabled={isLoading}
@@ -436,7 +525,14 @@ const DeliveryDetails = () => {
                             </Button>
                           </TableCell>
                           <TableCell>
-                            <StatusBadge status={getDeliveryStatus(delivery)} />
+                            <div className="space-y-1">
+                              <StatusBadge status={getDeliveryStatus(delivery)} />
+                              {getQubeWireProgress(delivery) > 0 && (
+                                <div className="text-xs text-muted-foreground">
+                                  Progress: {getQubeWireProgress(delivery)}%
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {getDeliveryDetails(delivery, getDeliveryType(delivery.delivery_method))}

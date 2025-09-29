@@ -45,6 +45,19 @@ const ApiSettingsDialog = () => {
     });
   };
 
+  const handleClearToken = () => {
+    localStorage.removeItem('qube_wire_token');
+    setToken('');
+    qubeWireApi.setToken('');
+    setConnectionStatus('idle');
+    setConnectionMessage('');
+    
+    toast({
+      title: "Token Cleared",
+      description: "Personal Access Token has been removed from storage"
+    });
+  };
+
   const handleTestConnection = async () => {
     if (!token.trim()) {
       toast({
@@ -181,6 +194,15 @@ const ApiSettingsDialog = () => {
               Test Connection
             </Button>
           </div>
+          {token && (
+            <Button 
+              variant="destructive" 
+              onClick={handleClearToken}
+              className="w-full"
+            >
+              Clear Token
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -37,8 +37,6 @@ const CplManagementTab = () => {
 
       if (ordersError) throw ordersError;
 
-      console.log('Orders data from CPL Management:', ordersData);
-      console.log('Looking for content_id 3400 specifically:', ordersData?.filter(o => o.content_id === '3400' || o.order_id === '3400'));
 
       // Get existing CPL data
       const { data: cplData, error: cplError } = await supabase

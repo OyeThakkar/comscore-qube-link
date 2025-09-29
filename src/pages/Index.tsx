@@ -19,13 +19,11 @@ const Index = () => {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
-    console.log("Sign out button clicked");
     try {
       await signOut();
-      console.log("Sign out completed, navigating to /auth");
       navigate("/auth", { replace: true });
     } catch (error) {
-      console.error("Sign out error:", error);
+      // Navigate to auth regardless of error
       navigate("/auth", { replace: true });
     }
   };
@@ -42,7 +40,6 @@ const Index = () => {
   }
 
   if (!isAuthenticated) {
-    console.log("User not authenticated, redirecting to /auth");
     return <Navigate to="/auth" replace />;
   }
 

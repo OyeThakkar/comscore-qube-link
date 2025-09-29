@@ -42,6 +42,9 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
+      // Clear API token from localStorage for security
+      localStorage.removeItem('qube_wire_token');
+      
       if (isDevelopmentMode) {
         setUser(null);
         setSession(null);
@@ -56,6 +59,8 @@ export const useAuth = () => {
       // Fallback: clear state even if an exception occurs
       setUser(null);
       setSession(null);
+      // Still clear token even on error for security
+      localStorage.removeItem('qube_wire_token');
       return { error } as any;
     }
   };

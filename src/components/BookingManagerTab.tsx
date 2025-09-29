@@ -129,19 +129,17 @@ const BookingManagerTab = () => {
         content.orders.push(order);
         content.booking_count++;
         
-        // Mock status assignment based on operation - in real app this would be tracked separately
-        switch (order.operation?.toLowerCase()) {
-          case 'insert':
-            content.pending_bookings++;
-            break;
-          case 'update':
-            content.shipped++;
-            break;
-          case 'cancel':
+        // Count bookings based on actual booking_ref status
+        if (order.booking_ref) {
+          // If booking reference exists, consider it as processed
+          if (order.operation?.toLowerCase() === 'cancel') {
             content.cancelled++;
-            break;
-          default:
-            content.pending_bookings++;
+          } else {
+            content.shipped++; // Has booking reference, so it's been processed
+          }
+        } else {
+          // No booking reference means it's still pending
+          content.pending_bookings++;
         }
         
         // Update latest timestamp
@@ -173,9 +171,12 @@ const BookingManagerTab = () => {
                 ? Math.round((content.completed / content.booking_count) * 100) 
                 : 0;
             } else {
-              // Fallback mock calculation
-              content.completed = Math.floor(content.shipped * 0.8);
-              content.downloading = content.shipped - content.completed;
+              // Calculate based on actual order data when no mock status available
+              const completedOrders = content.orders.filter(order => 
+                order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
+              );
+              content.completed = completedOrders.length;
+              content.downloading = Math.max(0, content.shipped - content.completed);
               content.completion_rate = content.booking_count > 0 
                 ? Math.round((content.completed / content.booking_count) * 100) 
                 : 0;
@@ -209,19 +210,29 @@ const BookingManagerTab = () => {
                 }
               } catch (apiError) {
                 console.warn(`Failed to fetch delivery status for ${content.content_id}:`, apiError);
-                // Fall back to mock calculation
-                content.completed = Math.floor(content.shipped * 0.8);
-                content.downloading = content.shipped - content.completed;
+                // Fall back to actual order data instead of mock calculation
+                const completedOrders = content.orders.filter(order => 
+                  order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
+                );
+                content.completed = completedOrders.length;
+                content.downloading = Math.max(0, content.shipped - content.completed);
                 content.completion_rate = content.booking_count > 0 
                   ? Math.round((content.completed / content.booking_count) * 100) 
                   : 0;
               }
             }
           } else {
-            // No API token - use mock data
+            // No API token - calculate based on actual booking references and order data
             bookingArray.forEach(content => {
-              content.completed = Math.floor(content.shipped * 0.8);
-              content.downloading = content.shipped - content.completed;
+              // Use actual data: completed are those with booking_ref and not cancelled
+              const completedOrders = content.orders.filter(order => 
+                order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
+              );
+              content.completed = completedOrders.length;
+              
+              // Calculate downloading as shipped but not yet completed
+              content.downloading = Math.max(0, content.shipped - content.completed);
+              
               content.completion_rate = content.booking_count > 0 
                 ? Math.round((content.completed / content.booking_count) * 100) 
                 : 0;
@@ -230,10 +241,17 @@ const BookingManagerTab = () => {
         }
       } catch (apiError) {
         console.warn('Failed to fetch delivery statuses from Qube Wire API:', apiError);
-        // Use mock calculation as fallback
+        // Use actual order data as fallback instead of mock calculations
         bookingArray.forEach(content => {
-          content.completed = Math.floor(content.shipped * 0.8);
-          content.downloading = content.shipped - content.completed;
+          // Use actual data: completed are those with booking_ref and not cancelled
+          const completedOrders = content.orders.filter(order => 
+            order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
+          );
+          content.completed = completedOrders.length;
+          
+          // Calculate downloading as shipped but not yet completed
+          content.downloading = Math.max(0, content.shipped - content.completed);
+          
           content.completion_rate = content.booking_count > 0 
             ? Math.round((content.completed / content.booking_count) * 100) 
             : 0;

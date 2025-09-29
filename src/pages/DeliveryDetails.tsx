@@ -79,19 +79,11 @@ const DeliveryDetails = () => {
 
       // Fetch real-time status from Qube Wire API
       try {
-        if (isDevelopmentMode) {
-          // Use mock delivery statuses in development mode
-          const mockStatuses = mockDeliveryStatuses[contentId as keyof typeof mockDeliveryStatuses];
-          if (mockStatuses) {
-            setQubeWireStatuses(mockStatuses);
-          }
-        } else {
-          const token = localStorage.getItem('qube_wire_token');
-          if (token && contentId && packageUuid) {
-            qubeWireApi.setToken(token);
-            const statuses = await qubeWireApi.getDeliveryStatuses(contentId, packageUuid);
-            setQubeWireStatuses(statuses || []);
-          }
+        const token = localStorage.getItem('qube_wire_token');
+        if (token && contentId && packageUuid) {
+          qubeWireApi.setToken(token);
+          const statuses = await qubeWireApi.getDeliveryStatuses(contentId, packageUuid);
+          setQubeWireStatuses(statuses || []);
         }
       } catch (apiError) {
         console.warn('Failed to fetch delivery statuses from Qube Wire API:', apiError);

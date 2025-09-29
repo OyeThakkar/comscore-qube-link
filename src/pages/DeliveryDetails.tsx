@@ -145,23 +145,13 @@ const DeliveryDetails = () => {
       }
     }
 
-    // Fallback to mock status logic for development
-    if (isDevelopmentMode) {
-      // More realistic mock status based on operation
-      switch (order.operation?.toLowerCase()) {
-        case 'insert':
-          return 'pending';
-        case 'update':
-          return order.booking_ref ? 'delivered' : 'shipped';
-        case 'cancel':
-          return 'cancelled';
-        default:
-          return 'pending';
-      }
+    // If no booking reference is present, status is pending
+    if (!order.booking_ref || !order.booking_ref.trim()) {
+      return 'pending';
     }
 
-    // Default fallback
-    return 'pending';
+    // If booking reference exists but no API status, assume shipped
+    return 'shipped';
   };
 
   const getQubeWireProgress = (order: any): number => {

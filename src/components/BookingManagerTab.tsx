@@ -14,9 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { qubeWireApi, type DeliveryStatus } from "@/services/qubeWireApi";
-import { mockOrders, mockCplData, mockDeliveryStatuses } from "@/services/mockData";
-
-const isDevelopmentMode = import.meta.env.VITE_DEV_MODE === 'true';
 
 interface BookingData {
   content_id: string;
@@ -52,32 +49,23 @@ const BookingManagerTab = () => {
     
     setIsLoading(true);
     try {
-      let orders, cplData;
+      // Fetch all orders for the user
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id);
 
-      if (isDevelopmentMode) {
-        // Use mock data in development mode
-        orders = mockOrders;
-        cplData = mockCplData;
-      } else {
-        // Fetch all orders for the user
-        const { data: ordersData, error: ordersError } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('user_id', user.id);
+      if (ordersError) throw ordersError;
 
-        if (ordersError) throw ordersError;
+      // Fetch CPL data for the user
+      const { data: cplData, error: cplError } = await supabase
+        .from('cpl_management')
+        .select('*')
+        .eq('user_id', user.id);
 
-        // Fetch CPL data for the user
-        const { data: cplDataResult, error: cplError } = await supabase
-          .from('cpl_management')
-          .select('*')
-          .eq('user_id', user.id);
+      if (cplError) throw cplError;
 
-        if (cplError) throw cplError;
-
-        orders = ordersData;
-        cplData = cplDataResult;
-      }
+      const orders = ordersData;
 
       // Create a map of CPL data by content_id and package_uuid
       const cplMap = new Map<string, string[]>();
@@ -153,91 +141,60 @@ const BookingManagerTab = () => {
       
       // Try to fetch delivery statuses from Qube Wire API
       try {
-        if (isDevelopmentMode) {
-          // Use mock delivery statuses in development mode
-          bookingArray.forEach(content => {
-            const mockStatuses = mockDeliveryStatuses[content.content_id as keyof typeof mockDeliveryStatuses];
-            if (mockStatuses) {
-              content.qube_wire_status = mockStatuses;
-              
-              // Update counts based on mock API data
-              content.completed = mockStatuses.filter(s => s.status === 'completed').length;
-              content.shipped = mockStatuses.filter(s => s.status === 'shipped').length;
-              content.downloading = mockStatuses.filter(s => s.status === 'downloading').length;
-              content.pending_bookings = mockStatuses.filter(s => s.status === 'pending').length;
-              content.cancelled = mockStatuses.filter(s => s.status === 'cancelled' || s.status === 'failed').length;
-              
-              content.completion_rate = content.booking_count > 0 
-                ? Math.round((content.completed / content.booking_count) * 100) 
-                : 0;
-            } else {
-              // Calculate based on actual order data when no mock status available
-              const completedOrders = content.orders.filter(order => 
-                order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
+        const token = localStorage.getItem('qube_wire_token');
+        if (token) {
+          qubeWireApi.setToken(token);
+          
+          for (const content of bookingArray) {
+            try {
+              const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(
+                content.content_id, 
+                content.package_uuid
               );
-              content.completed = completedOrders.length;
-              content.downloading = Math.max(0, content.shipped - content.completed);
-              content.completion_rate = content.booking_count > 0 
-                ? Math.round((content.completed / content.booking_count) * 100) 
-                : 0;
-            }
-          });
-        } else {
-          const token = localStorage.getItem('qube_wire_token');
-          if (token) {
-            qubeWireApi.setToken(token);
-            
-            for (const content of bookingArray) {
-              try {
-                const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(
-                  content.content_id, 
-                  content.package_uuid
-                );
+              
+              if (deliveryStatuses && deliveryStatuses.length > 0) {
+                content.qube_wire_status = deliveryStatuses;
                 
-                if (deliveryStatuses && deliveryStatuses.length > 0) {
-                  content.qube_wire_status = deliveryStatuses;
-                  
-                  // Update counts based on real API data
-                  content.completed = deliveryStatuses.filter(s => s.status === 'completed').length;
-                  content.shipped = deliveryStatuses.filter(s => s.status === 'shipped').length;
-                  content.downloading = deliveryStatuses.filter(s => s.status === 'downloading').length;
-                  content.pending_bookings = deliveryStatuses.filter(s => s.status === 'pending').length;
-                  content.cancelled = deliveryStatuses.filter(s => s.status === 'cancelled' || s.status === 'failed').length;
-                  
-                  content.completion_rate = content.booking_count > 0 
-                    ? Math.round((content.completed / content.booking_count) * 100) 
-                    : 0;
-                }
-              } catch (apiError) {
-                console.warn(`Failed to fetch delivery status for ${content.content_id}:`, apiError);
-                // Fall back to actual order data instead of mock calculation
-                const completedOrders = content.orders.filter(order => 
-                  order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
-                );
-                content.completed = completedOrders.length;
-                content.downloading = Math.max(0, content.shipped - content.completed);
+                // Update counts based on real API data
+                content.completed = deliveryStatuses.filter(s => s.status === 'completed').length;
+                content.shipped = deliveryStatuses.filter(s => s.status === 'shipped').length;
+                content.downloading = deliveryStatuses.filter(s => s.status === 'downloading').length;
+                content.pending_bookings = deliveryStatuses.filter(s => s.status === 'pending').length;
+                content.cancelled = deliveryStatuses.filter(s => s.status === 'cancelled' || s.status === 'failed').length;
+                
                 content.completion_rate = content.booking_count > 0 
                   ? Math.round((content.completed / content.booking_count) * 100) 
                   : 0;
               }
-            }
-          } else {
-            // No API token - calculate based on actual booking references and order data
-            bookingArray.forEach(content => {
-              // Use actual data: completed are those with booking_ref and not cancelled
+            } catch (apiError) {
+              console.warn(`Failed to fetch delivery status for ${content.content_id}:`, apiError);
+              // Fall back to actual order data
               const completedOrders = content.orders.filter(order => 
                 order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
               );
               content.completed = completedOrders.length;
-              
-              // Calculate downloading as shipped but not yet completed
               content.downloading = Math.max(0, content.shipped - content.completed);
-              
               content.completion_rate = content.booking_count > 0 
                 ? Math.round((content.completed / content.booking_count) * 100) 
                 : 0;
-            });
+            }
           }
+        } else {
+          // No API token - calculate based on actual booking references and order data
+          bookingArray.forEach(content => {
+            // Use actual data: completed are those with booking_ref and not cancelled
+            const completedOrders = content.orders.filter(order => 
+              order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
+            );
+            content.completed = completedOrders.length;
+            
+            // Calculate downloading as shipped but not yet completed
+            content.downloading = Math.max(0, content.shipped - content.completed);
+            
+            content.completion_rate = content.booking_count > 0 
+              ? Math.round((content.completed / content.booking_count) * 100) 
+              : 0;
+          });
         }
       } catch (apiError) {
         console.warn('Failed to fetch delivery statuses from Qube Wire API:', apiError);
@@ -272,24 +229,6 @@ const BookingManagerTab = () => {
   }, [user, toast]);
 
   const createBookingsForContent = async (contentData: BookingData) => {
-    if (isDevelopmentMode) {
-      // Mock booking creation in development mode
-      setIsCreatingBookings(true);
-      
-      setTimeout(() => {
-        toast({
-          title: "Bookings Created (Demo)",
-          description: `Successfully created ${contentData.orders.length} booking${contentData.orders.length !== 1 ? 's' : ''} for ${contentData.content_title}`,
-        });
-        
-        // Refresh the booking data to show updated statuses
-        fetchBookingData();
-        setIsCreatingBookings(false);
-      }, 2000);
-      
-      return;
-    }
-
     const token = localStorage.getItem('qube_wire_token');
     if (!token) {
       toast({

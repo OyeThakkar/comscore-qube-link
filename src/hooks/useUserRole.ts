@@ -19,13 +19,6 @@ export const useUserRole = () => {
       return;
     }
 
-    if (isDevelopmentMode) {
-      // Mock role for development
-      setRole('admin');
-      setLoading(false);
-      return;
-    }
-
     try {
       const { data, error } = await supabase
         .from('user_roles')
@@ -56,9 +49,9 @@ export const useUserRole = () => {
     }
   }, [user, authLoading]);
 
-  // Refresh role data every 10 seconds to catch updates (only in production)
+  // Refresh role data every 10 seconds to catch updates
   useEffect(() => {
-    if (!user || authLoading || isDevelopmentMode) return;
+    if (!user || authLoading) return;
     
     const interval = setInterval(() => {
       fetchUserRole();

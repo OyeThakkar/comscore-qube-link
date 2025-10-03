@@ -97,7 +97,7 @@ class QubeWireApiService {
     }
   }
 
-  // Create a booking using the v2 API
+  // Create a booking using the v1 API
   async createBooking(bookingData: BookingRequest): Promise<BookingResponse> {
     const payload = {
       content_id: bookingData.content_id,
@@ -114,15 +114,15 @@ class QubeWireApiService {
       operation: bookingData.operation || 'insert'
     };
 
-    return this.makeRequest<BookingResponse>('/v2/bookings', {
+    return this.makeRequest<BookingResponse>('/v1/bookings', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   }
 
-  // Fetch booking delivery statuses using the v2 API
+  // Fetch booking delivery statuses using the v1 API
   async getDeliveryStatuses(contentId?: string, packageUuid?: string): Promise<DeliveryStatus[]> {
-    let endpoint = '/v2/bookings/dcps';
+    let endpoint = '/v1/bookings';
     const params = new URLSearchParams();
     
     if (contentId) {

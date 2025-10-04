@@ -240,54 +240,42 @@ const BookingManagerTab = () => {
     }
 
     setIsCreatingBookings(true);
-    let successCount = 0;
-    let errorCount = 0;
 
     try {
       qubeWireApi.setToken(token);
 
-      // Create bookings for each order in this content
-      for (const order of contentData.orders) {
-        try {
-          const bookingRequest = {
-            content_id: order.content_id,
-            package_uuid: order.package_uuid,
-            film_id: order.film_id,
-            theatre_id: order.theatre_id,
-            theatre_name: order.theatre_name,
-            playdate_begin: order.playdate_begin,
-            playdate_end: order.playdate_end,
-            booker_name: order.booker_name,
-            booker_email: order.booker_email,
-            studio_name: order.studio_name,
-            delivery_method: order.delivery_method,
-            operation: order.operation || 'insert'
-          };
+      // Build dcpDeliveries array from orders
+      const dcpDeliveries = contentData.orders.map(order => ({
+        theatreId: order.theatre_id,
+        cplIds: contentData.cpl_list,
+        deliverBefore: order.playdate_end,
+        deliveryMode: "auto",
+        statusEmails: order.booker_email ? [order.booker_email] : [],
+        notes: order.notes || ""
+      }));
 
-          const response = await qubeWireApi.createBooking(bookingRequest);
-          
-          // Update the order with booking reference
-          if (response.booking_id) {
-            await supabase
-              .from('orders')
-              .update({ 
-                booking_ref: response.booking_id,
-                booking_created_at: new Date().toISOString()
-              })
-              .eq('id', order.id);
-          }
+      const bookingRequest = {
+        clientReferenceId: contentData.content_id,
+        dcpDeliveries
+      };
 
-          successCount++;
-        } catch (error: any) {
-          console.error(`Failed to create booking for order ${order.id}:`, error);
-          errorCount++;
+      const response = await qubeWireApi.createBooking(bookingRequest);
+      
+      // Update all orders with booking reference
+      if (response.booking_id) {
+        for (const order of contentData.orders) {
+          await supabase
+            .from('orders')
+            .update({ 
+              booking_ref: response.booking_id,
+              booking_created_at: new Date().toISOString()
+            })
+            .eq('id', order.id);
         }
-      }
 
-      if (successCount > 0) {
         toast({
           title: "Bookings Created",
-          description: `Successfully created ${successCount} booking${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
+          description: `Successfully created bookings for ${contentData.content_title}`,
         });
         
         // Refresh the booking data
@@ -295,7 +283,7 @@ const BookingManagerTab = () => {
       } else {
         toast({
           title: "Booking Creation Failed",
-          description: "No bookings were created successfully",
+          description: "No booking ID returned from API",
           variant: "destructive"
         });
       }

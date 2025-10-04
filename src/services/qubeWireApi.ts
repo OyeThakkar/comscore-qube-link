@@ -97,7 +97,7 @@ class QubeWireApiService {
     }
   }
 
-  // Create a booking using the v2 API
+  // Create a booking using the v1 API
   async createBooking(bookingData: BookingRequest): Promise<BookingResponse> {
     const payload = {
       content_id: bookingData.content_id,
@@ -114,7 +114,7 @@ class QubeWireApiService {
       operation: bookingData.operation || 'insert'
     };
 
-    return this.makeRequest<BookingResponse>('/v2/bookings', {
+    return this.makeRequest<BookingResponse>('/v1/bookings', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

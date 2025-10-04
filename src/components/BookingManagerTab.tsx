@@ -246,12 +246,12 @@ const BookingManagerTab = () => {
 
       // Build dcpDeliveries array from orders
       const dcpDeliveries = contentData.orders.map(order => ({
-        theatreId: order.theatre_id,
+        theatreId: order.qw_theatre_id,
         cplIds: contentData.cpl_list,
         deliverBefore: order.playdate_end,
         deliveryMode: "auto",
         statusEmails: order.booker_email ? [order.booker_email] : [],
-        notes: order.notes || ""
+        notes: order.note || ""
       }));
 
       const bookingRequest = {

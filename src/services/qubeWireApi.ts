@@ -15,10 +15,20 @@ interface BookingRequest {
   dcpDeliveries: DcpDelivery[];
 }
 
-interface BookingResponse {
-  booking_id: string;
+interface DcpDeliveryResponse {
+  clientReferenceId: string;
+  theatreId: string;
+  cplIds: string[];
+  deliverBefore: string;
+  deliveryMode: string;
+  statusEmails: string[];
+  notes: string;
+  dcpDeliveryId: string;
   status: string;
-  message?: string;
+}
+
+interface BookingResponse {
+  dcpDeliveries: DcpDeliveryResponse[];
 }
 
 interface DeliveryStatus {
@@ -138,4 +148,4 @@ class QubeWireApiService {
 }
 
 export const qubeWireApi = new QubeWireApiService();
-export type { BookingRequest, BookingResponse, DeliveryStatus, DcpDelivery };
+export type { BookingRequest, BookingResponse, DeliveryStatus, DcpDelivery, DcpDeliveryResponse };

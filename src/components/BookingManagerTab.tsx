@@ -261,21 +261,26 @@ const BookingManagerTab = () => {
 
       const response = await qubeWireApi.createBooking(bookingRequest);
       
-      // Update all orders with booking reference
-      if (response.booking_id) {
-        for (const order of contentData.orders) {
-          await supabase
-            .from('orders')
-            .update({ 
-              booking_ref: response.booking_id,
-              booking_created_at: new Date().toISOString()
-            })
-            .eq('id', order.id);
+      // Update orders with their corresponding dcpDeliveryId
+      if (response.dcpDeliveries && response.dcpDeliveries.length > 0) {
+        for (let i = 0; i < contentData.orders.length; i++) {
+          const order = contentData.orders[i];
+          const delivery = response.dcpDeliveries[i];
+          
+          if (delivery && delivery.dcpDeliveryId) {
+            await supabase
+              .from('orders')
+              .update({ 
+                booking_ref: delivery.dcpDeliveryId,
+                booking_created_at: new Date().toISOString()
+              })
+              .eq('id', order.id);
+          }
         }
 
         toast({
           title: "Bookings Created",
-          description: `Successfully created bookings for ${contentData.content_title}`,
+          description: `Successfully created ${response.dcpDeliveries.length} booking(s) for ${contentData.content_title}`,
         });
         
         // Refresh the booking data
@@ -283,7 +288,7 @@ const BookingManagerTab = () => {
       } else {
         toast({
           title: "Booking Creation Failed",
-          description: "No booking ID returned from API",
+          description: "No deliveries returned from API",
           variant: "destructive"
         });
       }

@@ -1,19 +1,18 @@
 // Qube Wire API service for booking management
 // Based on the API documentation: https://qubewire.docs.apiary.io/
 
+interface DcpDelivery {
+  theatreId: string;
+  cplIds: string[];
+  deliverBefore: string;
+  deliveryMode: string;
+  statusEmails: string[];
+  notes: string;
+}
+
 interface BookingRequest {
-  content_id: string;
-  package_uuid: string;
-  film_id?: string;
-  theatre_id?: string;
-  theatre_name?: string;
-  playdate_begin: string;
-  playdate_end: string;
-  booker_name?: string;
-  booker_email?: string;
-  studio_name?: string;
-  delivery_method?: string;
-  operation?: string;
+  clientReferenceId: string;
+  dcpDeliveries: DcpDelivery[];
 }
 
 interface BookingResponse {
@@ -97,26 +96,11 @@ class QubeWireApiService {
     }
   }
 
-  // Create a booking using the v1 API
+  // Create a booking using the v2 API
   async createBooking(bookingData: BookingRequest): Promise<BookingResponse> {
-    const payload = {
-      content_id: bookingData.content_id,
-      package_uuid: bookingData.package_uuid,
-      film_id: bookingData.film_id,
-      theatre_id: bookingData.theatre_id,
-      theatre_name: bookingData.theatre_name,
-      playdate_begin: bookingData.playdate_begin,
-      playdate_end: bookingData.playdate_end,
-      booker_name: bookingData.booker_name,
-      booker_email: bookingData.booker_email,
-      studio_name: bookingData.studio_name,
-      delivery_method: bookingData.delivery_method || 'Digital',
-      operation: bookingData.operation || 'insert'
-    };
-
-    return this.makeRequest<BookingResponse>('/v1/bookings', {
+    return this.makeRequest<BookingResponse>('/v2/bookings', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(bookingData),
     });
   }
 
@@ -154,4 +138,4 @@ class QubeWireApiService {
 }
 
 export const qubeWireApi = new QubeWireApiService();
-export type { BookingRequest, BookingResponse, DeliveryStatus };
+export type { BookingRequest, BookingResponse, DeliveryStatus, DcpDelivery };

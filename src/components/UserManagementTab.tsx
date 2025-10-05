@@ -241,7 +241,6 @@ export function UserManagementTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
@@ -253,11 +252,8 @@ export function UserManagementTab() {
             </TableHeader>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-mono text-xs">
-                    {user.id.substring(0, 8)}...
-                  </TableCell>
-                  <TableCell>{user.name || 'N/A'}</TableCell>
+              <TableRow key={user.id}>
+                <TableCell>{user.name || 'N/A'}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(user.role)}>

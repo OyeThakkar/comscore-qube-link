@@ -10,6 +10,7 @@ import StatusBadge from "./StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { z } from "zod";
 
 // Mock data for demonstration
 const mockOrders = [
@@ -152,15 +153,68 @@ const OrdersTab = () => {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && user) {
-      setSelectedFile(file);
-      setIsProcessing(true);
-      
-      const reader = new FileReader();
+    if (!file || !user) return;
+
+    // Validate file size (max 5MB)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file type
+    if (!file.name.endsWith('.csv') && file.type !== 'text/csv') {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a CSV file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    setIsProcessing(true);
+    
+    const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const text = e.target?.result as string;
           const parsedOrders = parseCSV(text);
+
+          // Limit number of rows
+          const MAX_ROWS = 1000;
+          if (parsedOrders.length > MAX_ROWS) {
+            throw new Error(`Too many rows. Maximum ${MAX_ROWS} rows allowed per upload.`);
+          }
+
+          // Validate CSV data with zod
+          const orderSchema = z.object({
+            content_title: z.string().max(500).optional(),
+            booker_email: z.string().email().max(255).optional().or(z.literal('')),
+            theatre_name: z.string().max(500).optional(),
+            qw_theatre_name: z.string().max(500).optional(),
+            operation: z.string().max(50).optional(),
+          });
+
+          // Validate each row
+          for (let i = 0; i < parsedOrders.length; i++) {
+            try {
+              const row = parsedOrders[i];
+              // Only validate non-empty email fields
+              if (row.booker_email && row.booker_email.trim()) {
+                orderSchema.parse(row);
+              } else {
+                // Validate without email requirement
+                orderSchema.omit({ booker_email: true }).parse(row);
+              }
+            } catch (validationError: any) {
+              throw new Error(`Row ${i + 2}: ${validationError.message}`);
+            }
+          }
           
           // Count operations (normalize whitespace/casing)
           const normalizeOp = (op: any) => (op ?? '').toString().trim().toLowerCase();
@@ -180,9 +234,14 @@ const OrdersTab = () => {
             allowedKeys.forEach((key) => {
               const value = order[key as keyof typeof order];
               if (key === 'playdate_begin' || key === 'playdate_end') {
-                cleaned[key] = value ? new Date(value).toISOString().split('T')[0] : null;
+                try {
+                  cleaned[key] = value ? new Date(value).toISOString().split('T')[0] : null;
+                } catch {
+                  cleaned[key] = null;
+                }
               } else if (typeof value === 'string') {
-                cleaned[key] = value.trim();
+                // Sanitize string values
+                cleaned[key] = value.trim().substring(0, 1000);
               } else if (value !== undefined) {
                 cleaned[key] = value;
               } else {
@@ -226,7 +285,6 @@ const OrdersTab = () => {
         }
       };
       reader.readAsText(file);
-    }
   };
 
   const filteredOrders = orders.filter(order => 

@@ -18,7 +18,7 @@ import { mockOrders, mockDeliveryStatuses } from "@/services/mockData";
 const isDevelopmentMode = import.meta.env.VITE_DEV_MODE === 'true';
 
 const DeliveryDetails = () => {
-  const { contentId, packageUuid } = useParams();
+  const { contentId } = useParams();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -35,34 +35,18 @@ const DeliveryDetails = () => {
   const fetchDeliveries = useCallback(async () => {
     if (!contentId) return;
     
-    // Decode the packageUuid from URL encoding and handle the case where it might be 'no-package' (empty in DB)
-    const decodedPackageUuid = packageUuid ? decodeURIComponent(packageUuid) : '';
-    const actualPackageUuid = decodedPackageUuid === 'no-package' ? '' : decodedPackageUuid;
-    
     setIsLoading(true);
     try {
       let deliveriesData;
 
       if (isDevelopmentMode) {
         // Use mock data in development mode
-        deliveriesData = mockOrders.filter(order => 
-          order.content_id === contentId && 
-          (actualPackageUuid === '' ? !order.package_uuid || order.package_uuid === '' : order.package_uuid === actualPackageUuid)
-        );
+        deliveriesData = mockOrders.filter(order => order.content_id === contentId);
       } else {
-        const query = supabase
+        const { data, error } = await supabase
           .from('orders')
           .select('*')
           .eq('content_id', contentId);
-        
-        // Filter by package_uuid - if actualPackageUuid is empty, look for null or empty string
-        if (actualPackageUuid) {
-          query.eq('package_uuid', actualPackageUuid);
-        } else {
-          query.or('package_uuid.is.null,package_uuid.eq.');
-        }
-
-        const { data, error } = await query;
 
         if (error) throw error;
         deliveriesData = data || [];
@@ -92,9 +76,9 @@ const DeliveryDetails = () => {
       // Fetch real-time status from Qube Wire API
       try {
         const token = localStorage.getItem('qube_wire_token');
-        if (token && contentId && actualPackageUuid) {
+        if (token && contentId) {
           qubeWireApi.setToken(token);
-          const statuses = await qubeWireApi.getDeliveryStatuses(contentId, actualPackageUuid);
+          const statuses = await qubeWireApi.getDeliveryStatuses(contentId);
           setQubeWireStatuses(statuses || []);
         }
       } catch (apiError) {
@@ -116,13 +100,13 @@ const DeliveryDetails = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, contentId, packageUuid, toast]);
+  }, [contentId, toast]);
 
   useEffect(() => {
     if (contentId) {
       fetchDeliveries();
     }
-  }, [contentId, packageUuid, fetchDeliveries]);
+  }, [contentId, fetchDeliveries]);
 
   const getDeliveryStatus = (order: any): "pending" | "shipped" | "downloading" | "delivered" | "downloaded" | "cancelled" => {
     // Check if we have real-time status from Qube Wire API

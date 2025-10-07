@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { qubeWireApi, type DeliveryStatus } from "@/services/qubeWireApi";
+import { mockOrders } from "@/services/mockData";
 
 interface BookingData {
   content_id: string;
@@ -49,66 +50,68 @@ const BookingManagerTab = () => {
     
     setIsLoading(true);
     try {
-      // Fetch all orders (all users) with pagination
-      const PAGE_SIZE = 1000;
-      let from = 0;
-      let allOrders: any[] = [];
-      while (true) {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*')
-          .range(from, from + PAGE_SIZE - 1);
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allOrders = allOrders.concat(data);
+      const isDevelopmentMode = import.meta.env.VITE_DEV_MODE === 'true';
+      let ordersData: any[] = [];
+      let cplData: any[] = [];
+
+      if (isDevelopmentMode) {
+        // Use mock data in development mode
+        ordersData = mockOrders;
+        // Mock CPL data if needed
+      } else {
+        // Fetch all orders with pagination
+        let allOrders: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data: ordersBatch, error: ordersError } = await supabase
+            .from('orders')
+            .select('*')
+            .range(from, from + batchSize - 1);
+
+          if (ordersError) throw ordersError;
+          
+          if (ordersBatch && ordersBatch.length > 0) {
+            allOrders = [...allOrders, ...ordersBatch];
+            from += batchSize;
+            hasMore = ordersBatch.length === batchSize;
+          } else {
+            hasMore = false;
+          }
         }
-        if (!data || data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
+
+        ordersData = allOrders;
+
+        // Fetch CPL data
+        const { data: cplDataResult, error: cplError } = await supabase
+          .from('cpl_management')
+          .select('*');
+
+        if (cplError) throw cplError;
+        cplData = cplDataResult || [];
       }
 
-      // Fetch CPL data (all users)
-      const { data: cplData, error: cplError } = await supabase
-        .from('cpl_management')
-        .select('*');
-
-      if (cplError) throw cplError;
-
-      const orders = allOrders;
-
-      // Create a map of CPL data by content_id and package_uuid
-      const cplMap = new Map<string, string[]>();
-      cplData?.forEach(cpl => {
-        const key = `${cpl.content_id}-${cpl.package_uuid}`;
-        if (!cplMap.has(key)) {
-          cplMap.set(key, []);
-        }
-        const list = (cpl.cpl_list || '')
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-        const current = cplMap.get(key)!;
-        list.forEach((item: string) => {
-          if (!current.includes(item)) current.push(item);
-        });
-      });
-
-      // Group orders by content_id and package_uuid to create booking data
-      const contentMap = new Map<string, BookingData>();
-      
-      orders?.forEach(order => {
-        if (!order.content_id || !order.content_title) return;
+      // Group orders by content_id only
+      const groupedData = ordersData.reduce((acc: any, order: any) => {
+        const key = order.content_id;
         
-        const key = `${order.content_id}-${order.package_uuid}`;
-        
-        if (!contentMap.has(key)) {
-          const cplList = cplMap.get(key) || [];
-          contentMap.set(key, {
+        if (!acc[key]) {
+          // Find matching CPL data for this content
+          const matchingCpl = cplData.find(cpl => cpl.content_id === order.content_id);
+          
+          acc[key] = {
             content_id: order.content_id,
             content_title: order.content_title,
-            package_uuid: order.package_uuid,
+            package_uuid: order.package_uuid || '', // Keep for reference but don't use in grouping
             film_id: order.film_id,
-            cpl_list: cplList,
-            cpl_count: cplList.length,
+            cpl_list: matchingCpl?.cpl_list ? (
+              typeof matchingCpl.cpl_list === 'string' 
+                ? matchingCpl.cpl_list.split(',').map((s: string) => s.trim()) 
+                : matchingCpl.cpl_list
+            ) : [],
+            cpl_count: 0,
             booking_count: 0,
             pending_bookings: 0,
             shipped: 0,
@@ -118,109 +121,82 @@ const BookingManagerTab = () => {
             updated_on: order.updated_at,
             completion_rate: 0,
             orders: []
-          });
-        }
-        
-        const content = contentMap.get(key)!;
-        content.orders.push(order);
-        content.booking_count++;
-        
-        // Count bookings based on actual booking_ref status
-        if (order.booking_ref) {
-          // If booking reference exists, consider it as processed
-          if (order.operation?.toLowerCase() === 'cancel') {
-            content.cancelled++;
-          } else {
-            content.shipped++; // Has booking reference, so it's been processed
-          }
-        } else {
-          // No booking reference means it's still pending
-          content.pending_bookings++;
-        }
-        
-        // Update latest timestamp
-        if (new Date(order.updated_at) > new Date(content.updated_on)) {
-          content.updated_on = order.updated_at;
-        }
-      });
+          };
 
-      // Fetch real-time status from Qube Wire API for each content
-      const bookingArray = Array.from(contentMap.values());
-      
-      // Try to fetch delivery statuses from Qube Wire API
+          // Calculate CPL count
+          if (acc[key].cpl_list.length > 0) {
+            acc[key].cpl_count = acc[key].cpl_list.length;
+          }
+        }
+
+        acc[key].orders.push(order);
+        acc[key].booking_count++;
+
+        // Update status counts
+        if (!order.booking_ref || !order.booking_ref.trim()) {
+          acc[key].pending_bookings++;
+        }
+
+        // Keep the most recent update time
+        if (new Date(order.updated_at) > new Date(acc[key].updated_on)) {
+          acc[key].updated_on = order.updated_at;
+        }
+
+        return acc;
+      }, {});
+
+      const bookingArray: BookingData[] = Object.values(groupedData);
+
+      // Fetch delivery statuses from Qube Wire API for all content
       try {
         const token = localStorage.getItem('qube_wire_token');
         if (token) {
           qubeWireApi.setToken(token);
           
-          for (const content of bookingArray) {
+          // Fetch statuses for each unique content
+          const statusPromises = bookingArray.map(async (booking) => {
             try {
-              const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(
-                content.content_id, 
-                content.package_uuid
-              );
-              
-              if (deliveryStatuses && deliveryStatuses.length > 0) {
-                content.qube_wire_status = deliveryStatuses;
-                
-                // Update counts based on real API data
-                content.completed = deliveryStatuses.filter(s => s.status === 'completed').length;
-                content.shipped = deliveryStatuses.filter(s => s.status === 'shipped').length;
-                content.downloading = deliveryStatuses.filter(s => s.status === 'downloading').length;
-                content.pending_bookings = deliveryStatuses.filter(s => s.status === 'pending').length;
-                content.cancelled = deliveryStatuses.filter(s => s.status === 'cancelled' || s.status === 'failed').length;
-                
-                content.completion_rate = content.booking_count > 0 
-                  ? Math.round((content.completed / content.booking_count) * 100) 
-                  : 0;
-              }
-            } catch (apiError) {
-              console.warn(`Failed to fetch delivery status for ${content.content_id}:`, apiError);
-              // Fall back to actual order data
-              const completedOrders = content.orders.filter(order => 
-                order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
-              );
-              content.completed = completedOrders.length;
-              content.downloading = Math.max(0, content.shipped - content.completed);
-              content.completion_rate = content.booking_count > 0 
-                ? Math.round((content.completed / content.booking_count) * 100) 
-                : 0;
+              const statuses = await qubeWireApi.getDeliveryStatuses(booking.content_id);
+              return { content_id: booking.content_id, statuses };
+            } catch (error) {
+              console.warn(`Failed to fetch statuses for content ${booking.content_id}:`, error);
+              return { content_id: booking.content_id, statuses: [] };
             }
-          }
-        } else {
-          // No API token - calculate based on actual booking references and order data
-          bookingArray.forEach(content => {
-            // Use actual data: completed are those with booking_ref and not cancelled
-            const completedOrders = content.orders.filter(order => 
-              order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
-            );
-            content.completed = completedOrders.length;
-            
-            // Calculate downloading as shipped but not yet completed
-            content.downloading = Math.max(0, content.shipped - content.completed);
-            
-            content.completion_rate = content.booking_count > 0 
-              ? Math.round((content.completed / content.booking_count) * 100) 
-              : 0;
+          });
+
+          const allStatuses = await Promise.all(statusPromises);
+          
+          // Update booking data with Qube Wire statuses
+          bookingArray.forEach(booking => {
+            const statusData = allStatuses.find(s => s.content_id === booking.content_id);
+            if (statusData && statusData.statuses.length > 0) {
+              booking.qube_wire_status = statusData.statuses;
+              
+              // Update counts based on API status
+              statusData.statuses.forEach(status => {
+                switch (status.status) {
+                  case 'downloading':
+                    booking.downloading++;
+                    break;
+                  case 'completed':
+                    booking.completed++;
+                    break;
+                  case 'cancelled':
+                  case 'failed':
+                    booking.cancelled++;
+                    break;
+                }
+              });
+              
+              // Calculate completion rate
+              if (booking.booking_count > 0) {
+                booking.completion_rate = Math.round((booking.completed / booking.booking_count) * 100);
+              }
+            }
           });
         }
       } catch (apiError) {
         console.warn('Failed to fetch delivery statuses from Qube Wire API:', apiError);
-        // Use actual order data as fallback instead of mock calculations
-        bookingArray.forEach(content => {
-          // Use actual data: completed are those with booking_ref and not cancelled
-          const completedOrders = content.orders.filter(order => 
-            order.booking_ref && order.operation?.toLowerCase() !== 'cancel'
-          );
-          content.completed = completedOrders.length;
-          
-          // Calculate downloading as shipped but not yet completed
-          content.downloading = Math.max(0, content.shipped - content.completed);
-          
-          content.completion_rate = content.booking_count > 0 
-            ? Math.round((content.completed / content.booking_count) * 100) 
-            : 0;
-        });
       }
 
       setBookingData(bookingArray);
@@ -336,7 +312,7 @@ const BookingManagerTab = () => {
       const token = localStorage.getItem('qube_wire_token');
       if (token) {
         qubeWireApi.setToken(token);
-        const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(item.content_id, item.package_uuid);
+        const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(item.content_id);
         console.log('Delivery statuses from v1/dcps:', deliveryStatuses);
       }
     } catch (error) {
@@ -348,7 +324,7 @@ const BookingManagerTab = () => {
       });
     }
     
-    navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
+    navigate(`/delivery-details/${item.content_id}`);
   };
 
   const filteredData = bookingData.filter(item => 

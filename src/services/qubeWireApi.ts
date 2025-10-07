@@ -1,34 +1,25 @@
 // Qube Wire API service for booking management
 // Based on the API documentation: https://qubewire.docs.apiary.io/
 
-interface DcpDelivery {
-  theatreId: string;
-  cplIds: string[];
-  deliverBefore: string;
-  deliveryMode: string;
-  statusEmails: string[];
-  notes: string;
-}
-
 interface BookingRequest {
-  clientReferenceId: string;
-  dcpDeliveries: DcpDelivery[];
-}
-
-interface DcpDeliveryResponse {
-  clientReferenceId: string;
-  theatreId: string;
-  cplIds: string[];
-  deliverBefore: string;
-  deliveryMode: string;
-  statusEmails: string[];
-  notes: string;
-  dcpDeliveryId: string;
-  status: string;
+  content_id: string;
+  package_uuid: string;
+  film_id?: string;
+  theatre_id?: string;
+  theatre_name?: string;
+  playdate_begin: string;
+  playdate_end: string;
+  booker_name?: string;
+  booker_email?: string;
+  studio_name?: string;
+  delivery_method?: string;
+  operation?: string;
 }
 
 interface BookingResponse {
-  dcpDeliveries: DcpDeliveryResponse[];
+  booking_id: string;
+  status: string;
+  message?: string;
 }
 
 interface DeliveryStatus {
@@ -108,13 +99,28 @@ class QubeWireApiService {
 
   // Create a booking using the v1 API
   async createBooking(bookingData: BookingRequest): Promise<BookingResponse> {
+    const payload = {
+      content_id: bookingData.content_id,
+      package_uuid: bookingData.package_uuid,
+      film_id: bookingData.film_id,
+      theatre_id: bookingData.theatre_id,
+      theatre_name: bookingData.theatre_name,
+      playdate_begin: bookingData.playdate_begin,
+      playdate_end: bookingData.playdate_end,
+      booker_name: bookingData.booker_name,
+      booker_email: bookingData.booker_email,
+      studio_name: bookingData.studio_name,
+      delivery_method: bookingData.delivery_method || 'Digital',
+      operation: bookingData.operation || 'insert'
+    };
+
     return this.makeRequest<BookingResponse>('/v1/bookings', {
       method: 'POST',
-      body: JSON.stringify(bookingData),
+      body: JSON.stringify(payload),
     });
   }
 
-  // Fetch booking delivery statuses using the v1 API
+  // Fetch booking delivery statuses using the v2 API
   async getDeliveryStatuses(contentId?: string, packageUuid?: string): Promise<DeliveryStatus[]> {
     let endpoint = '/v1/bookings/dcps';
     const params = new URLSearchParams();
@@ -148,4 +154,4 @@ class QubeWireApiService {
 }
 
 export const qubeWireApi = new QubeWireApiService();
-export type { BookingRequest, BookingResponse, DeliveryStatus, DcpDelivery, DcpDeliveryResponse };
+export type { BookingRequest, BookingResponse, DeliveryStatus };

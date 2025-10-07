@@ -213,16 +213,6 @@ const BookingManagerTab = () => {
   }, [user, toast]);
 
   const createBookingsForContent = async (contentData: BookingData) => {
-    const token = localStorage.getItem('qube_wire_token');
-    if (!token) {
-      toast({
-        title: "API Token Required",
-        description: "Please configure your Qube Wire Personal Access Token in API Settings",
-        variant: "destructive"
-      });
-      return;
-    }
-
     // Filter only pending orders (those without booking_ref)
     const pendingOrders = contentData.orders.filter(order => !order.booking_ref);
     
@@ -238,50 +228,152 @@ const BookingManagerTab = () => {
     setIsCreatingBookings(true);
 
     try {
-      qubeWireApi.setToken(token);
+      // Group pending orders by distributor (studio_id + qw_company_id)
+      const ordersByDistributor = pendingOrders.reduce((acc: any, order: any) => {
+        if (!order.studio_id || !order.qw_company_id) {
+          console.warn('Order missing distributor information:', order.id);
+          return acc;
+        }
+        
+        const distributorKey = `${order.studio_id}_${order.qw_company_id}`;
+        
+        if (!acc[distributorKey]) {
+          acc[distributorKey] = {
+            studio_id: order.studio_id,
+            qw_company_id: order.qw_company_id,
+            studio_name: order.studio_name,
+            qw_company_name: order.qw_company_name,
+            orders: []
+          };
+        }
+        
+        acc[distributorKey].orders.push(order);
+        return acc;
+      }, {});
 
-      // Build dcpDeliveries array from pending orders only
-      const dcpDeliveries = pendingOrders.map(order => ({
-        theatreId: order.qw_theatre_id,
-        cplIds: contentData.cpl_list,
-        deliverBefore: order.playdate_end,
-        deliveryMode: "auto",
-        statusEmails: order.booker_email ? [order.booker_email] : [],
-        notes: order.note || ""
-      }));
-
-      const bookingRequest = {
-        clientReferenceId: contentData.content_id,
-        dcpDeliveries
-      };
-
-      const response = await qubeWireApi.createBooking(bookingRequest);
+      const distributorGroups = Object.values(ordersByDistributor) as any[];
       
-      // Update pending orders with their corresponding dcpDeliveryId
-      if (response.dcpDeliveries && response.dcpDeliveries.length > 0) {
-        for (let i = 0; i < pendingOrders.length; i++) {
-          const order = pendingOrders[i];
-          const delivery = response.dcpDeliveries[i];
-          
-          if (delivery && delivery.dcpDeliveryId) {
-            await supabase
-              .from('orders')
-              .update({ 
-                booking_ref: delivery.dcpDeliveryId,
-                booking_created_at: new Date().toISOString()
-              })
-              .eq('id', order.id);
-          }
+      if (distributorGroups.length === 0) {
+        toast({
+          title: "Error",
+          description: "No orders with valid distributor information found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch PATs for all distributors using OR conditions for each studio_id + qw_company_id pair
+      let distributorsQuery = supabase
+        .from('distributors')
+        .select('studio_id, qw_company_id, qw_pat_encrypted');
+
+      // Build OR conditions for each distributor pair
+      if (distributorGroups.length > 0) {
+        const orConditions = distributorGroups.map(g => 
+          `and(studio_id.eq.${g.studio_id},qw_company_id.eq.${g.qw_company_id})`
+        ).join(',');
+        distributorsQuery = distributorsQuery.or(orConditions);
+      }
+
+      const { data: distributors, error: distributorsError } = await distributorsQuery;
+
+      if (distributorsError) {
+        console.error('Error fetching distributors:', distributorsError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch distributor information",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      let totalCreatedBookings = 0;
+      let totalProcessedOrders = 0;
+      const failedDistributors: string[] = [];
+
+      // Process each distributor group separately
+      for (const distributorGroup of distributorGroups) {
+        const distributor = distributors?.find(d => 
+          d.studio_id === distributorGroup.studio_id && 
+          d.qw_company_id === distributorGroup.qw_company_id
+        );
+
+        if (!distributor || !distributor.qw_pat_encrypted) {
+          console.warn(`No PAT found for distributor: ${distributorGroup.studio_name} (${distributorGroup.studio_id})`);
+          failedDistributors.push(`${distributorGroup.studio_name}`);
+          continue;
         }
 
+        try {
+          // Decrypt the PAT (it's base64 encoded)
+          const decryptedPAT = atob(distributor.qw_pat_encrypted);
+          qubeWireApi.setToken(decryptedPAT);
+
+          // Build dcpDeliveries array for this distributor's orders
+          const dcpDeliveries = distributorGroup.orders.map((order: any) => ({
+            theatreId: order.qw_theatre_id,
+            cplIds: contentData.cpl_list,
+            deliverBefore: order.playdate_end,
+            deliveryMode: "auto",
+            statusEmails: order.booker_email ? [order.booker_email] : [],
+            notes: order.note || ""
+          }));
+
+          const bookingRequest = {
+            clientReferenceId: contentData.content_id,
+            dcpDeliveries
+          };
+
+          const response = await qubeWireApi.createBooking(bookingRequest);
+          
+          // Update orders with their corresponding dcpDeliveryId
+          if (response.dcpDeliveries && response.dcpDeliveries.length > 0) {
+            for (let i = 0; i < distributorGroup.orders.length; i++) {
+              const order = distributorGroup.orders[i];
+              const delivery = response.dcpDeliveries[i];
+              
+              if (delivery && delivery.dcpDeliveryId) {
+                await supabase
+                  .from('orders')
+                  .update({ 
+                    booking_ref: delivery.dcpDeliveryId,
+                    booking_created_at: new Date().toISOString()
+                  })
+                  .eq('id', order.id);
+                
+                totalProcessedOrders++;
+              }
+            }
+            
+            totalCreatedBookings += response.dcpDeliveries.length;
+          }
+
+        } catch (error: any) {
+          console.error(`Error creating bookings for distributor ${distributorGroup.studio_name}:`, error);
+          failedDistributors.push(`${distributorGroup.studio_name}: ${error.message}`);
+        }
+      }
+
+      // Show appropriate success/error messages
+      if (totalCreatedBookings > 0) {
         toast({
           title: "Bookings Created",
-          description: `Successfully created ${response.dcpDeliveries.length} booking(s) for ${contentData.content_title}`,
+          description: `Successfully created ${totalCreatedBookings} booking(s) for ${contentData.content_title}`,
         });
         
         // Refresh the booking data
         fetchBookingData();
-      } else {
+      }
+
+      if (failedDistributors.length > 0) {
+        toast({
+          title: failedDistributors.length === distributorGroups.length ? "Booking Creation Failed" : "Partial Success",
+          description: `Failed for distributors: ${failedDistributors.join(', ')}`,
+          variant: "destructive"
+        });
+      }
+
+      if (totalCreatedBookings === 0 && failedDistributors.length === 0) {
         toast({
           title: "Booking Creation Failed",
           description: "No deliveries returned from API",

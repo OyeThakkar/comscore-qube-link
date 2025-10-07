@@ -262,12 +262,20 @@ const BookingManagerTab = () => {
         return;
       }
 
-      // Fetch PATs for all distributors
-      const { data: distributors, error: distributorsError } = await supabase
+      // Fetch PATs for all distributors using OR conditions for each studio_id + qw_company_id pair
+      let distributorsQuery = supabase
         .from('distributors')
-        .select('studio_id, qw_company_id, qw_pat_encrypted')
-        .in('studio_id', distributorGroups.map(g => g.studio_id))
-        .in('qw_company_id', distributorGroups.map(g => g.qw_company_id));
+        .select('studio_id, qw_company_id, qw_pat_encrypted');
+
+      // Build OR conditions for each distributor pair
+      if (distributorGroups.length > 0) {
+        const orConditions = distributorGroups.map(g => 
+          `and(studio_id.eq.${g.studio_id},qw_company_id.eq.${g.qw_company_id})`
+        ).join(',');
+        distributorsQuery = distributorsQuery.or(orConditions);
+      }
+
+      const { data: distributors, error: distributorsError } = await distributorsQuery;
 
       if (distributorsError) {
         console.error('Error fetching distributors:', distributorsError);

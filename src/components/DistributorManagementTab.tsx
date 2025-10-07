@@ -57,7 +57,27 @@ export const DistributorManagementTab = () => {
     if (!user) return;
     
     try {
-      // Fetch existing distributors
+      // Fetch unique studio/company combinations from orders (primary source)
+      const { data: orderCombinations, error: ordersError } = await supabase
+        .from('orders')
+        .select('studio_id, studio_name, qw_company_id, qw_company_name')
+        .not('studio_id', 'is', null)
+        .not('studio_name', 'is', null)
+        .not('qw_company_id', 'is', null)
+        .not('qw_company_name', 'is', null);
+
+      if (ordersError) {
+        console.error('Error fetching order combinations:', ordersError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch distributor data from orders",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Fetch existing distributors (for PAT and metadata)
       const { data: existingDistributors, error: distributorsError } = await supabase
         .from('distributors')
         .select('*')
@@ -65,12 +85,7 @@ export const DistributorManagementTab = () => {
 
       if (distributorsError) {
         console.error('Error fetching distributors:', distributorsError);
-        toast({
-          title: "Limited view",
-          description: "Showing distributors inferred from orders only",
-          variant: "default",
-        });
-        // Continue to fetch from orders even if distributors query fails due to RLS
+        // Continue without distributors table data - just show orders
       }
 
       // Fetch profiles for updated_by mapping
@@ -95,61 +110,55 @@ export const DistributorManagementTab = () => {
         }
       }
 
-      // Fetch unique studio/company combinations from orders
-      const { data: orderCombinations, error: ordersError } = await supabase
-        .from('orders')
-        .select('studio_id, studio_name, qw_company_id, qw_company_name')
-        .not('studio_id', 'is', null)
-        .not('studio_name', 'is', null)
-        .not('qw_company_id', 'is', null)
-        .not('qw_company_name', 'is', null);
+      // Create a map of existing distributors by combination key
+      const distributorsMap = new Map<string, any>();
+      (existingDistributors || []).forEach(d => {
+        const key = `${d.studio_id}-${d.qw_company_id}`;
+        distributorsMap.set(key, d);
+      });
 
-      if (ordersError) {
-        console.error('Error fetching order combinations:', ordersError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch order combinations for distributors",
-          variant: "destructive",
-        });
-      }
-
-      // Create a set of existing distributor combinations for quick lookup
-      const existingCombinations = new Set(
-        (existingDistributors || []).map(d => `${d.studio_id}-${d.qw_company_id}`)
-      );
-
-      // Find unique combinations from orders that don't exist in distributors
-      const uniqueOrderCombinations = [];
-      const seenCombinations = new Set();
+      // Build final list: merge order combinations with distributor metadata
+      const seenCombinations = new Set<string>();
+      const allDistributors: Distributor[] = [];
 
       (orderCombinations || []).forEach(order => {
         const combinationKey = `${order.studio_id}-${order.qw_company_id}`;
-        if (!existingCombinations.has(combinationKey) && !seenCombinations.has(combinationKey)) {
+        
+        if (!seenCombinations.has(combinationKey)) {
           seenCombinations.add(combinationKey);
-          uniqueOrderCombinations.push({
-            id: `order-${combinationKey}`, // Temporary ID to distinguish from real distributors
-            studio_id: order.studio_id,
-            studio_name: order.studio_name,
-            qw_company_id: order.qw_company_id,
-            qw_company_name: order.qw_company_name,
-            qw_pat_encrypted: null,
-            created_at: '',
-            updated_at: '',
-            user_id: '',
-            isFromOrders: true // Flag to identify these entries
-          });
+          
+          const existingDistributor = distributorsMap.get(combinationKey);
+          
+          if (existingDistributor) {
+            // Use existing distributor record with all metadata
+            allDistributors.push(existingDistributor);
+          } else {
+            // Create entry from orders data
+            allDistributors.push({
+              id: `order-${combinationKey}`,
+              studio_id: order.studio_id,
+              studio_name: order.studio_name,
+              qw_company_id: order.qw_company_id,
+              qw_company_name: order.qw_company_name,
+              qw_pat_encrypted: null,
+              created_at: '',
+              updated_at: '',
+              updated_by: null,
+              user_id: '',
+              isFromOrders: true
+            });
+          }
         }
       });
-
-      // Combine existing distributors with new combinations from orders
-      const allDistributors = [
-        ...(existingDistributors || []),
-        ...uniqueOrderCombinations
-      ];
 
       setDistributors(allDistributors);
     } catch (error) {
       console.error('Error in fetchDistributors:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load distributor data",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

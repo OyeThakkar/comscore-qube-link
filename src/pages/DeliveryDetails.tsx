@@ -33,7 +33,7 @@ const DeliveryDetails = () => {
   const { toast } = useToast();
 
   const fetchDeliveries = useCallback(async () => {
-    if (!user || !contentId) return;
+    if (!contentId) return;
     
     // Handle the case where packageUuid might be 'no-package' (empty in DB)
     const actualPackageUuid = packageUuid === 'no-package' ? '' : (packageUuid || '');
@@ -116,10 +116,10 @@ const DeliveryDetails = () => {
   }, [user, contentId, packageUuid, toast]);
 
   useEffect(() => {
-    if (user && contentId) {
+    if (contentId) {
       fetchDeliveries();
     }
-  }, [user, contentId, packageUuid, fetchDeliveries]);
+  }, [contentId, packageUuid, fetchDeliveries]);
 
   const getDeliveryStatus = (order: any): "pending" | "shipped" | "downloading" | "delivered" | "downloaded" | "cancelled" => {
     // Check if we have real-time status from Qube Wire API

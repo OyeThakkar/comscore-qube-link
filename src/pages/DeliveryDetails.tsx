@@ -55,9 +55,11 @@ const DeliveryDetails = () => {
           .select('*')
           .eq('content_id', contentId);
         
-        // Only filter by package_uuid if it's not empty
+        // Filter by package_uuid - if actualPackageUuid is empty, look for null or empty string
         if (actualPackageUuid) {
           query.eq('package_uuid', actualPackageUuid);
+        } else {
+          query.or('package_uuid.is.null,package_uuid.eq.');
         }
 
         const { data, error } = await query;

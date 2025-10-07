@@ -120,7 +120,7 @@ class QubeWireApiService {
     });
   }
 
-  // Fetch booking delivery statuses using the v2 API
+  // Fetch booking delivery statuses using the v1 API
   async getDeliveryStatuses(contentId?: string, packageUuid?: string): Promise<DeliveryStatus[]> {
     let endpoint = '/v1/bookings/dcps';
     const params = new URLSearchParams();
@@ -136,7 +136,8 @@ class QubeWireApiService {
       endpoint += `?${params.toString()}`;
     }
 
-    return this.makeRequest<DeliveryStatus[]>(endpoint);
+    const response = await this.makeRequest<{ data: DeliveryStatus[]; offset: number; ps: number; totalCount: number; hasMore: boolean }>(endpoint);
+    return response.data || [];
   }
 
   // Test API connection

@@ -66,11 +66,11 @@ export const DistributorManagementTab = () => {
       if (distributorsError) {
         console.error('Error fetching distributors:', distributorsError);
         toast({
-          title: "Error",
-          description: "Failed to fetch distributors",
-          variant: "destructive",
+          title: "Limited view",
+          description: "Showing distributors inferred from orders only",
+          variant: "default",
         });
-        return;
+        // Continue to fetch from orders even if distributors query fails due to RLS
       }
 
       // Fetch profiles for updated_by mapping

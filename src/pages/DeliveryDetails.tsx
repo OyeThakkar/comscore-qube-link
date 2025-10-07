@@ -332,11 +332,11 @@ const DeliveryDetails = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/?tab=booking-manager")}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to CPL Management
+              Back to Booking Manager
             </Button>
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,19 @@ import { DistributorManagementTab } from "@/components/DistributorManagementTab"
 import { UserManagementTab } from "@/components/UserManagementTab";
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState("orders");
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam || "orders");
   const { user, loading, signOut, isAuthenticated } = useAuth();
   const { role: userRole, hasPermission, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
+
+  // Update active tab when URL param changes
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   const handleSignOut = async () => {
     try {

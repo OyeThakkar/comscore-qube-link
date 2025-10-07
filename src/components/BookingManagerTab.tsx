@@ -49,23 +49,31 @@ const BookingManagerTab = () => {
     
     setIsLoading(true);
     try {
-      // Fetch all orders for the user
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id);
+      // Fetch all orders (all users) with pagination
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      let allOrders: any[] = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allOrders = allOrders.concat(data);
+        }
+        if (!data || data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
-      if (ordersError) throw ordersError;
-
-      // Fetch CPL data for the user
+      // Fetch CPL data (all users)
       const { data: cplData, error: cplError } = await supabase
         .from('cpl_management')
-        .select('*')
-        .eq('user_id', user.id);
+        .select('*');
 
       if (cplError) throw cplError;
 
-      const orders = ordersData;
+      const orders = allOrders;
 
       // Create a map of CPL data by content_id and package_uuid
       const cplMap = new Map<string, string[]>();

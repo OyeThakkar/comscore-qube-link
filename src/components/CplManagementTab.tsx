@@ -47,17 +47,26 @@ const CplManagementTab = () => {
       if (cplError) throw cplError;
 
       // Get unique combinations and merge with CPL data
-      const uniqueContent = (ordersData || []).reduce((acc: any[], order: any) => {
-        const normalizedContentId = String(order.content_id ?? order.order_id ?? '').trim();
+      const uniqueContentMap = new Map();
+      
+      (ordersData || []).forEach((order: any) => {
+        const normalizedContentId = String(order.content_id ?? '').trim();
         const normalizedPackage = String(order.package_uuid ?? '').trim();
-        const key = `${normalizedContentId}-${normalizedPackage}`;
-        if (!acc.find(item => `${String(item.content_id ?? '').trim()}-${String(item.package_uuid ?? '').trim()}` === key)) {
+        
+        // Skip if either content_id or package_uuid is missing
+        if (!normalizedContentId || !normalizedPackage) return;
+        
+        const key = `${normalizedContentId}|${normalizedPackage}`;
+        
+        // Only add if not already in map
+        if (!uniqueContentMap.has(key)) {
           // Find existing CPL data for this combination
           const existingCpl = cplData?.find(cpl =>
-            String(cpl.content_id ?? '').trim() === normalizedContentId && String(cpl.package_uuid ?? '').trim() === normalizedPackage
+            String(cpl.content_id ?? '').trim() === normalizedContentId && 
+            String(cpl.package_uuid ?? '').trim() === normalizedPackage
           );
           
-          acc.push({
+          uniqueContentMap.set(key, {
             content_id: normalizedContentId,
             content_title: (order.content_title ?? '').trim() || null,
             package_uuid: normalizedPackage,
@@ -68,8 +77,9 @@ const CplManagementTab = () => {
             updated_on: existingCpl?.updated_at || ''
           });
         }
-        return acc;
-      }, []);
+      });
+      
+      const uniqueContent = Array.from(uniqueContentMap.values());
 
       setCplData(uniqueContent);
     } catch (error: any) {

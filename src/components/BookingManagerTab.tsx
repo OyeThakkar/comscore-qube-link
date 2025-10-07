@@ -239,13 +239,25 @@ const BookingManagerTab = () => {
       return;
     }
 
+    // Filter only pending orders (those without booking_ref)
+    const pendingOrders = contentData.orders.filter(order => !order.booking_ref);
+    
+    if (pendingOrders.length === 0) {
+      toast({
+        title: "No Pending Bookings",
+        description: "All bookings for this content have already been created",
+        variant: "default"
+      });
+      return;
+    }
+
     setIsCreatingBookings(true);
 
     try {
       qubeWireApi.setToken(token);
 
-      // Build dcpDeliveries array from orders
-      const dcpDeliveries = contentData.orders.map(order => ({
+      // Build dcpDeliveries array from pending orders only
+      const dcpDeliveries = pendingOrders.map(order => ({
         theatreId: order.qw_theatre_id,
         cplIds: contentData.cpl_list,
         deliverBefore: order.playdate_end,
@@ -261,10 +273,10 @@ const BookingManagerTab = () => {
 
       const response = await qubeWireApi.createBooking(bookingRequest);
       
-      // Update orders with their corresponding dcpDeliveryId
+      // Update pending orders with their corresponding dcpDeliveryId
       if (response.dcpDeliveries && response.dcpDeliveries.length > 0) {
-        for (let i = 0; i < contentData.orders.length; i++) {
-          const order = contentData.orders[i];
+        for (let i = 0; i < pendingOrders.length; i++) {
+          const order = pendingOrders[i];
           const delivery = response.dcpDeliveries[i];
           
           if (delivery && delivery.dcpDeliveryId) {
@@ -526,10 +538,10 @@ const BookingManagerTab = () => {
                             variant="default" 
                             className="h-8"
                             onClick={() => createBookingsForContent(item)}
-                            disabled={isCreatingBookings || item.cpl_count === 0}
+                            disabled={isCreatingBookings || item.cpl_count === 0 || item.pending_bookings === 0}
                           >
-                            <Send className="h-3 w-3 mr-1" />
-                            Create Booking
+                            <Send className={`h-3 w-3 mr-1 ${isCreatingBookings ? 'animate-pulse' : ''}`} />
+                            {isCreatingBookings ? 'Creating...' : 'Create Booking'}
                           </Button>
                         </div>
                       </TableCell>

@@ -37,6 +37,7 @@ const CplManagementTab = () => {
 
       if (ordersError) throw ordersError;
 
+      console.log('Orders fetched:', ordersData?.length);
 
       // Get existing CPL data
       const { data: cplData, error: cplError } = await supabase
@@ -50,27 +51,30 @@ const CplManagementTab = () => {
       const uniqueContentMap = new Map();
       
       (ordersData || []).forEach((order: any) => {
-        const normalizedContentId = String(order.content_id ?? '').trim();
-        const normalizedPackage = String(order.package_uuid ?? '').trim();
+        const contentId = order.content_id?.toString().trim() || '';
+        const packageUuid = order.package_uuid?.toString().trim() || '';
         
         // Skip if either content_id or package_uuid is missing
-        if (!normalizedContentId || !normalizedPackage) return;
+        if (!contentId || !packageUuid) {
+          console.log('Skipping order with missing data:', order);
+          return;
+        }
         
-        const key = `${normalizedContentId}|${normalizedPackage}`;
+        const key = `${contentId}|||${packageUuid}`;
         
         // Only add if not already in map
         if (!uniqueContentMap.has(key)) {
           // Find existing CPL data for this combination
           const existingCpl = cplData?.find(cpl =>
-            String(cpl.content_id ?? '').trim() === normalizedContentId && 
-            String(cpl.package_uuid ?? '').trim() === normalizedPackage
+            cpl.content_id?.toString().trim() === contentId && 
+            cpl.package_uuid?.toString().trim() === packageUuid
           );
           
           uniqueContentMap.set(key, {
-            content_id: normalizedContentId,
-            content_title: (order.content_title ?? '').trim() || null,
-            package_uuid: normalizedPackage,
-            film_id: (order.film_id ?? '').trim() || null,
+            content_id: contentId,
+            content_title: order.content_title?.toString().trim() || null,
+            package_uuid: packageUuid,
+            film_id: order.film_id?.toString().trim() || null,
             cpl_list: existingCpl?.cpl_list || '',
             booking_count: 0,
             updated_by: existingCpl?.updated_at ? 'User' : '',
@@ -80,6 +84,7 @@ const CplManagementTab = () => {
       });
       
       const uniqueContent = Array.from(uniqueContentMap.values());
+      console.log('Unique content items:', uniqueContent.length, uniqueContent);
 
       setCplData(uniqueContent);
     } catch (error: any) {

@@ -124,8 +124,10 @@ const DeliveryDetails = () => {
   const getDeliveryStatus = (order: any): "pending" | "shipped" | "downloading" | "delivered" | "downloaded" | "cancelled" => {
     // Check if we have real-time status from Qube Wire API
     const qubeWireStatus = qubeWireStatuses.find(status => 
-      status.booking_id === order.booking_ref || 
-      status.theatre_name === order.theatre_name
+      status.dcpDeliveryId === order.booking_ref || 
+      status.theatreId === order.qw_theatre_id ||
+      status.theatreId === order.tmc_theatre_id ||
+      status.theatreName === order.theatre_name
     );
     
     if (qubeWireStatus) {
@@ -157,14 +159,30 @@ const DeliveryDetails = () => {
 
   const getQubeWireProgress = (order: any): number => {
     const qubeWireStatus = qubeWireStatuses.find(status => 
-      status.booking_id === order.booking_ref || 
-      status.theatre_name === order.theatre_name
+      status.dcpDeliveryId === order.booking_ref || 
+      status.theatreId === order.qw_theatre_id ||
+      status.theatreId === order.tmc_theatre_id ||
+      status.theatreName === order.theatre_name
     );
     
     return qubeWireStatus?.progress || 0;
   };
 
-  const getDeliveryType = (deliveryMethod: string) => {
+  const getDeliveryType = (order: any) => {
+    // First check if we have delivery type from Qube Wire API
+    const qubeWireStatus = qubeWireStatuses.find(status => 
+      status.dcpDeliveryId === order.booking_ref || 
+      status.theatreId === order.qw_theatre_id ||
+      status.theatreId === order.tmc_theatre_id ||
+      status.theatreName === order.theatre_name
+    );
+    
+    if (qubeWireStatus?.deliveryType) {
+      return qubeWireStatus.deliveryType;
+    }
+    
+    // Fallback to delivery method from order
+    const deliveryMethod = order.delivery_method;
     if (!deliveryMethod) return 'Electronic - Partner';
     if (deliveryMethod.toLowerCase().includes('wiretap')) return 'WireTAP';
     if (deliveryMethod.toLowerCase().includes('drive')) return 'Hard Drive';
@@ -305,18 +323,46 @@ const DeliveryDetails = () => {
     }
   };
 
-  const getDeliveryDetails = (delivery: any, deliveryType: string) => {
+  const getDeliveryDetails = (order: any, deliveryType: string) => {
+    // First check if we have delivery details from Qube Wire API
+    const qubeWireStatus = qubeWireStatuses.find(status => 
+      status.dcpDeliveryId === order.booking_ref || 
+      status.theatreId === order.qw_theatre_id ||
+      status.theatreId === order.tmc_theatre_id ||
+      status.theatreName === order.theatre_name
+    );
+    
+    if (qubeWireStatus?.deliveryDetails) {
+      if (qubeWireStatus.deliveryDetails.serialNumber) {
+        return (
+          <div className="space-y-1 text-sm">
+            <div><span className="font-medium">Serial:</span> {qubeWireStatus.deliveryDetails.serialNumber}</div>
+            {qubeWireStatus.deliveryDetails.trackingId && (
+              <div><span className="font-medium">Tracking:</span> {qubeWireStatus.deliveryDetails.trackingId}</div>
+            )}
+          </div>
+        );
+      } else if (qubeWireStatus.deliveryDetails.partner) {
+        return (
+          <div className="text-sm">
+            <span className="font-medium">Partner:</span> {qubeWireStatus.deliveryDetails.partner}
+          </div>
+        );
+      }
+    }
+    
+    // Fallback to order data
     if (deliveryType === 'WireTAP') {
       return (
         <div className="space-y-1 text-sm">
-          <div><span className="font-medium">Serial:</span> {delivery.wiretap_serial_number || 'N/A'}</div>
-          <div><span className="font-medium">Tracking:</span> {delivery.tracking_id || 'N/A'}</div>
+          <div><span className="font-medium">Serial:</span> {order.wiretap_serial_number || 'N/A'}</div>
+          <div><span className="font-medium">Tracking:</span> {order.tracking_id || 'N/A'}</div>
         </div>
       );
     } else if (deliveryType === 'Electronic - Partner') {
       return (
         <div className="text-sm">
-          <span className="font-medium">Partner:</span> {delivery.partner_name || 'N/A'}
+          <span className="font-medium">Partner:</span> {order.partner_name || 'N/A'}
         </div>
       );
     }
@@ -507,7 +553,7 @@ const DeliveryDetails = () => {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {getDeliveryType(delivery.delivery_method)}
+                              {getDeliveryType(delivery)}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -526,7 +572,7 @@ const DeliveryDetails = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {getDeliveryDetails(delivery, getDeliveryType(delivery.delivery_method))}
+                            {getDeliveryDetails(delivery, getDeliveryType(delivery))}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -535,6 +581,11 @@ const DeliveryDetails = () => {
                                 value={bookingRefs[delivery.id] || ''}
                                 onChange={(e) => handleIndividualBookingRefChange(delivery.id, e.target.value)}
                                 className="w-32 h-8 text-sm"
+                                disabled={!!qubeWireStatuses.find(status => 
+                                  status.dcpDeliveryId === delivery.booking_ref || 
+                                  status.theatreId === delivery.qw_theatre_id ||
+                                  status.theatreId === delivery.tmc_theatre_id
+                                )}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     saveIndividualBookingRef(delivery.id);

@@ -29,13 +29,22 @@ interface BookingResponse {
 }
 
 interface DeliveryStatus {
-  booking_id: string;
-  content_id: string;
-  package_uuid: string;
+  dcpDeliveryId: string;
+  theatreId: string;
+  theatreName?: string;
+  cplIds?: string[];
+  deliverBefore?: string;
+  deliveryMode?: string;
+  statusEmails?: string[];
+  notes?: string;
   status: 'pending' | 'shipped' | 'downloading' | 'completed' | 'cancelled' | 'failed';
-  theatre_name: string;
-  delivery_date?: string;
   progress?: number;
+  deliveryType?: string;
+  deliveryDetails?: {
+    partner?: string;
+    serialNumber?: string;
+    trackingId?: string;
+  };
   error_message?: string;
 }
 

@@ -165,10 +165,10 @@ export const DistributorManagementTab = () => {
   };
 
   useEffect(() => {
-    if (user && !roleLoading) {
+    if (user) {
       fetchDistributors();
     }
-  }, [user, roleLoading]);
+  }, [user]);
 
   const handleAddDistributor = async () => {
     if (!user) return;

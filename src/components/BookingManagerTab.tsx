@@ -330,7 +330,24 @@ const BookingManagerTab = () => {
     }
   }, [user, fetchBookingData]);
 
-  const handleViewDetails = (item: BookingData) => {
+  const handleViewDetails = async (item: BookingData) => {
+    try {
+      // Make API call to v1/dcps
+      const token = localStorage.getItem('qube_wire_token');
+      if (token) {
+        qubeWireApi.setToken(token);
+        const deliveryStatuses = await qubeWireApi.getDeliveryStatuses(item.content_id, item.package_uuid);
+        console.log('Delivery statuses from v1/dcps:', deliveryStatuses);
+      }
+    } catch (error) {
+      console.error('Error fetching delivery statuses:', error);
+      toast({
+        title: "API Warning",
+        description: "Unable to fetch delivery data from Qube Wire API",
+        variant: "destructive"
+      });
+    }
+    
     navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
   };
 

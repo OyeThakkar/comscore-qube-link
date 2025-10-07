@@ -29,12 +29,20 @@ const CplManagementTab = () => {
     
     setIsLoading(true);
     try {
-      // Get all unique content from orders (all users)
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('content_id, content_title, package_uuid, film_id, order_id');
-
-      if (ordersError) throw ordersError;
+      // Fetch orders in pages to include more than 1000 rows
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      let allOrders: any[] = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('content_id, content_title, package_uuid, film_id, order_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        allOrders = allOrders.concat(data || []);
+        if (!data || data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
       // Get existing CPL data (all users)
       const { data: cplData, error: cplError } = await supabase
@@ -46,7 +54,7 @@ const CplManagementTab = () => {
       // Get unique combinations and merge with CPL data
       const uniqueContentMap = new Map();
       
-      (ordersData || []).forEach((order: any) => {
+      (allOrders || []).forEach((order: any) => {
         const contentId = order.content_id?.toString().trim() || '';
         const packageUuid = order.package_uuid?.toString().trim() || '';
         

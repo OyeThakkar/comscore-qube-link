@@ -106,6 +106,11 @@ export const DistributorManagementTab = () => {
 
       if (ordersError) {
         console.error('Error fetching order combinations:', ordersError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch order combinations for distributors",
+          variant: "destructive",
+        });
       }
 
       // Create a set of existing distributor combinations for quick lookup

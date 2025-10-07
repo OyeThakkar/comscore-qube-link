@@ -35,8 +35,9 @@ const DeliveryDetails = () => {
   const fetchDeliveries = useCallback(async () => {
     if (!contentId) return;
     
-    // Handle the case where packageUuid might be 'no-package' (empty in DB)
-    const actualPackageUuid = packageUuid === 'no-package' ? '' : (packageUuid || '');
+    // Decode the packageUuid from URL encoding and handle the case where it might be 'no-package' (empty in DB)
+    const decodedPackageUuid = packageUuid ? decodeURIComponent(packageUuid) : '';
+    const actualPackageUuid = decodedPackageUuid === 'no-package' ? '' : decodedPackageUuid;
     
     setIsLoading(true);
     try {

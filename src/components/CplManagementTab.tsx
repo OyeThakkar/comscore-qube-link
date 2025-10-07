@@ -165,7 +165,10 @@ const CplManagementTab = () => {
   };
 
   const handleViewDetails = (item: any) => {
-    navigate(`/delivery-details/${item.content_id}/${item.package_uuid}`);
+    const packageParam = item.package_uuid && item.package_uuid.trim() 
+      ? item.package_uuid 
+      : 'no-package';
+    navigate(`/delivery-details/${item.content_id}/${packageParam}`);
   };
 
   const filteredData = cplData.filter(item => 

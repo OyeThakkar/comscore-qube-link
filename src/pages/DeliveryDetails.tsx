@@ -33,7 +33,10 @@ const DeliveryDetails = () => {
   const { toast } = useToast();
 
   const fetchDeliveries = useCallback(async () => {
-    if (!user || !contentId || !packageUuid) return;
+    if (!user || !contentId) return;
+    
+    // Handle the case where packageUuid might be 'no-package' (empty in DB)
+    const actualPackageUuid = packageUuid === 'no-package' ? '' : (packageUuid || '');
     
     setIsLoading(true);
     try {
@@ -42,15 +45,21 @@ const DeliveryDetails = () => {
       if (isDevelopmentMode) {
         // Use mock data in development mode
         deliveriesData = mockOrders.filter(order => 
-          order.content_id === contentId && order.package_uuid === packageUuid
+          order.content_id === contentId && 
+          (actualPackageUuid === '' ? !order.package_uuid || order.package_uuid === '' : order.package_uuid === actualPackageUuid)
         );
       } else {
-        const { data, error } = await supabase
+        const query = supabase
           .from('orders')
           .select('*')
-          .eq('user_id', user.id)
-          .eq('content_id', contentId)
-          .eq('package_uuid', packageUuid);
+          .eq('content_id', contentId);
+        
+        // Only filter by package_uuid if it's not empty
+        if (actualPackageUuid) {
+          query.eq('package_uuid', actualPackageUuid);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         deliveriesData = data || [];
@@ -80,9 +89,9 @@ const DeliveryDetails = () => {
       // Fetch real-time status from Qube Wire API
       try {
         const token = localStorage.getItem('qube_wire_token');
-        if (token && contentId && packageUuid) {
+        if (token && contentId && actualPackageUuid) {
           qubeWireApi.setToken(token);
-          const statuses = await qubeWireApi.getDeliveryStatuses(contentId, packageUuid);
+          const statuses = await qubeWireApi.getDeliveryStatuses(contentId, actualPackageUuid);
           setQubeWireStatuses(statuses || []);
         }
       } catch (apiError) {
@@ -107,7 +116,7 @@ const DeliveryDetails = () => {
   }, [user, contentId, packageUuid, toast]);
 
   useEffect(() => {
-    if (user && contentId && packageUuid) {
+    if (user && contentId) {
       fetchDeliveries();
     }
   }, [user, contentId, packageUuid, fetchDeliveries]);

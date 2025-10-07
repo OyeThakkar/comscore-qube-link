@@ -57,41 +57,28 @@ export const DistributorManagementTab = () => {
     if (!user) return;
     
     try {
-      // Fetch unique studio/company combinations from orders (primary source)
-      const { data: orderCombinations, error: ordersError } = await supabase
-        .from('orders')
-        .select('studio_id, studio_name, qw_company_id, qw_company_name')
-        .not('studio_id', 'is', null)
-        .not('studio_name', 'is', null)
-        .not('qw_company_id', 'is', null)
-        .not('qw_company_name', 'is', null);
-
-      if (ordersError) {
-        console.error('Error fetching order combinations:', ordersError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch distributor data from orders",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Fetch existing distributors (for PAT and metadata)
-      const { data: existingDistributors, error: distributorsError } = await supabase
+      // Fetch all distributors directly from distributors table
+      // (trigger automatically keeps it in sync with orders)
+      const { data: distributorsData, error: distributorsError } = await supabase
         .from('distributors')
         .select('*')
         .order('studio_name', { ascending: true });
 
       if (distributorsError) {
         console.error('Error fetching distributors:', distributorsError);
-        // Continue without distributors table data - just show orders
+        toast({
+          title: "Error",
+          description: "Failed to fetch distributors",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
       }
 
       // Fetch profiles for updated_by mapping
-      if (existingDistributors && existingDistributors.length > 0) {
+      if (distributorsData && distributorsData.length > 0) {
         const updatedByIds = [...new Set(
-          existingDistributors
+          distributorsData
             .map(d => d.updated_by)
             .filter(Boolean)
         )];
@@ -110,48 +97,7 @@ export const DistributorManagementTab = () => {
         }
       }
 
-      // Create a map of existing distributors by combination key
-      const distributorsMap = new Map<string, any>();
-      (existingDistributors || []).forEach(d => {
-        const key = `${d.studio_id}-${d.qw_company_id}`;
-        distributorsMap.set(key, d);
-      });
-
-      // Build final list: merge order combinations with distributor metadata
-      const seenCombinations = new Set<string>();
-      const allDistributors: Distributor[] = [];
-
-      (orderCombinations || []).forEach(order => {
-        const combinationKey = `${order.studio_id}-${order.qw_company_id}`;
-        
-        if (!seenCombinations.has(combinationKey)) {
-          seenCombinations.add(combinationKey);
-          
-          const existingDistributor = distributorsMap.get(combinationKey);
-          
-          if (existingDistributor) {
-            // Use existing distributor record with all metadata
-            allDistributors.push(existingDistributor);
-          } else {
-            // Create entry from orders data
-            allDistributors.push({
-              id: `order-${combinationKey}`,
-              studio_id: order.studio_id,
-              studio_name: order.studio_name,
-              qw_company_id: order.qw_company_id,
-              qw_company_name: order.qw_company_name,
-              qw_pat_encrypted: null,
-              created_at: '',
-              updated_at: '',
-              updated_by: null,
-              user_id: '',
-              isFromOrders: true
-            });
-          }
-        }
-      });
-
-      setDistributors(allDistributors);
+      setDistributors(distributorsData || []);
     } catch (error) {
       console.error('Error in fetchDistributors:', error);
       toast({
@@ -432,37 +378,17 @@ export const DistributorManagementTab = () => {
                     </TableCell>
                     {hasPermission(['admin']) && (
                       <TableCell>
-                        {distributor.isFromOrders ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setNewDistributor({
-                                studio_id: distributor.studio_id,
-                                studio_name: distributor.studio_name,
-                                qw_company_id: distributor.qw_company_id,
-                                qw_company_name: distributor.qw_company_name,
-                                qw_pat: ""
-                              });
-                              setIsAddDialogOpen(true);
-                            }}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add Distributor
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedDistributor(distributor);
-                              setIsUpdatePATDialogOpen(true);
-                            }}
-                          >
-                            <Key className="h-3 w-3 mr-1" />
-                            Update PAT
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedDistributor(distributor);
+                            setIsUpdatePATDialogOpen(true);
+                          }}
+                        >
+                          <Key className="h-3 w-3 mr-1" />
+                          Update PAT
+                        </Button>
                       </TableCell>
                     )}
                   </TableRow>

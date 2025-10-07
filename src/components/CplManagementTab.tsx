@@ -29,21 +29,17 @@ const CplManagementTab = () => {
     
     setIsLoading(true);
     try {
-      // Get all unique content from orders for current user
+      // Get all unique content from orders (all users)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('content_id, content_title, package_uuid, film_id, order_id')
-        .eq('user_id', user.id);
+        .select('content_id, content_title, package_uuid, film_id, order_id');
 
       if (ordersError) throw ordersError;
 
-      console.log('Orders fetched:', ordersData?.length);
-
-      // Get existing CPL data
+      // Get existing CPL data (all users)
       const { data: cplData, error: cplError } = await supabase
         .from('cpl_management')
-        .select('*')
-        .eq('user_id', user.id);
+        .select('*');
 
       if (cplError) throw cplError;
 
@@ -56,7 +52,6 @@ const CplManagementTab = () => {
         
         // Skip if either content_id or package_uuid is missing
         if (!contentId || !packageUuid) {
-          console.log('Skipping order with missing data:', order);
           return;
         }
         
@@ -84,7 +79,6 @@ const CplManagementTab = () => {
       });
       
       const uniqueContent = Array.from(uniqueContentMap.values());
-      console.log('Unique content items:', uniqueContent.length, uniqueContent);
 
       setCplData(uniqueContent);
     } catch (error: any) {
